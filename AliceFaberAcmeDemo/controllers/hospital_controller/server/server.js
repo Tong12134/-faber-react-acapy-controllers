@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import acapy from "./src/acapy.js";
+import * as acapy from "./src/acapy.js";
 import connections from "./src/routes.connections.js";
 // import issue from "./src/routes.issue.js";
 // import verify from "./src/routes.verify.js";
@@ -39,10 +39,10 @@ app.use("/api/credentials", credentials);
 app.post("/webhooks/topic/:topic", webhooks);
 
 // 靜態檔（生產或你想用 Express 直接服務 React）
-app.use(express.static(path.join(__dirname, "../client/dist")));
-app.get("*", (req, res) =>
-  res.sendFile(path.join(__dirname, "../client/dist/index.html"))
-);
+// app.use(express.static(path.join(__dirname, "../client/dist")));
+// app.get("*", (req, res) =>
+//   res.sendFile(path.join(__dirname, "../client/dist/index.html"))
+// );
 
 const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => console.log(`[hospital-controller] listening on :${PORT}`));

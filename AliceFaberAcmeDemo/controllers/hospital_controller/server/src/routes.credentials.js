@@ -1,4 +1,4 @@
-import acapy from "./acapy.js";
+import * as acapy from "./acapy.js";
 import express from "express";
 import bodyParser from "body-parser";
 

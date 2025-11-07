@@ -1,30 +1,58 @@
-import React from "react";
-import { api } from "../api";
+// client/src/pages/Connections.jsx
+import { useState, useEffect } from "react";
+import ConnectionCard from "../components/ConnectionCard";
+import NewConnectionForm from "../components/NewConnectionForm";
+import AcceptConnectionForm from "../components/AcceptConnectionForm";
 
-export default function Connections() {
-  const [list, setList] = React.useState(null);
-  const [invite, setInvite] = React.useState(null);
-  const [err, setErr] = React.useState("");
+export default function ConnectionsPage() {
+  const [connections, setConnections] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = () => api.listConnections().then(setList).catch(e => setErr(e.message));
+  const fetchConnections = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/connections");
+      const data = await res.json();
+      if (data.ok) {
+        setConnections(data.results || []);
+      } else {
+        alert("Failed to load connections: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  React.useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    fetchConnections();
+  }, []);
 
   return (
-    <div>
-      <h3>Connections</h3>
-      <button onClick={() => api.createInvitation().then(setInvite).then(refresh)}>建立邀請</button>
-      {invite && (
+    <div className="container" style={{ maxWidth: "800px", padding: "20px" }}>
+      <h2>Connections</h2>
+
+      <NewConnectionForm onCreated={fetchConnections} />
+      <AcceptConnectionForm onAccepted={fetchConnections} />
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
         <>
-          <h4>Invitation</h4>
-          <pre>{JSON.stringify(invite, null, 2)}</pre>
-          <div>Invitation URL：<a href={invite?.invitation_url} target="_blank">{invite?.invitation_url}</a></div>
+          {connections.length === 0 ? (
+            <p>No connections yet.</p>
+          ) : (
+            connections.map((c) => (
+              <ConnectionCard
+                key={c.connection_id}
+                connection={c}
+                onRefresh={fetchConnections}
+              />
+            ))
+          )}
         </>
       )}
-      <hr/>
-      <button onClick={refresh}>重新整理</button>
-      <pre>{JSON.stringify(list, null, 2)}</pre>
-      {err && <pre style={{ color: "crimson" }}>{err}</pre>}
     </div>
   );
 }
