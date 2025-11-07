@@ -1,0 +1,165 @@
+version: '3'
+
+services:
+    # Agents
+    faber-agent:
+
+        image: ghcr.io/openwallet-foundation/acapy-agent:py3.12-1.2-lts
+        command: 
+            [
+            "start",
+            "--label", "Faber Agent",
+            "--inbound-transport", "http", "0.0.0.0", "8020",
+            "--outbound-transport", "http",
+            "--admin", "0.0.0.0", "8021",
+            "--admin-insecure-mode",
+            "--endpoint", "http://faber-agent:8020",
+            "--wallet-type", "askar",
+            "--wallet-name", "faber_wallet",
+            "--wallet-key", "faber_secret",
+            "--seed", "faber000000000000000000000000001",
+            "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
+            "--auto-provision",
+            "--auto-accept-invites",
+            "--auto-accept-requests",
+            "--auto-respond-messages",
+            "--auto-respond-credential-offer",
+            "--auto-respond-credential-request",
+            "--auto-respond-presentation-request"
+            ]
+        # command: ['faber --port 8020 --aip 10']
+        # build:
+        #     context: https://github.com/hyperledger/aries-cloudagent-python.git#main
+        #     dockerfile: ./docker/Dockerfile.demo
+        ports:
+            - 8120:8020
+            - 8121:8021
+            # - 8020-8027:8020-8027
+        networks:
+            - aca
+        # environment:
+        #     - RUNMODE=${RUNMODE}
+        #     - DOCKERHOST=${DOCKERHOST}
+        #     - LEDGER_URL=http://test.bcovrin.vonx.io
+        #     - GENESIS_URL=http://test.bcovrin.vonx.io/genesis
+            # - LEDGER_URL=${LEDGER_URL}
+            # - GENESIS_URL=${GENESIS_URL}
+        tty: true
+
+    alice-agent:
+
+        image: ghcr.io/openwallet-foundation/acapy-agent:py3.12-1.2-lts
+        command: 
+            [
+            "start",
+            "--label", "Alice Agent",
+            "--inbound-transport", "http", "0.0.0.0", "8030",
+            "--outbound-transport", "http",
+            "--admin", "0.0.0.0", "8031",
+            "--admin-insecure-mode",
+            "--endpoint", "http://alice-agent:8030",
+            "--wallet-type", "askar",
+            "--wallet-name", "alice_wallet",
+            "--wallet-key", "alice_secret",
+            # "--seed", "alice000000000000000000000000001",
+            "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
+            "--auto-provision",
+            "--auto-accept-invites",
+            "--auto-accept-requests",
+            "--auto-respond-messages"
+            ]
+
+        # command: ['alice --port 8030 --aip 10']
+        # build:
+            # context: https://github.com/hyperledger/aries-cloudagent-python.git#main
+            # dockerfile: ./docker/Dockerfile.demo
+        ports:
+            - 8130:8030
+            - 8131:8031
+            # - 8030-8037:8030-8037
+        networks:
+            - aca
+        # environment:
+        #     - RUNMODE=${RUNMODE}
+        #     - DOCKERHOST=${DOCKERHOST}
+        #     - LEDGER_URL=http://test.bcovrin.vonx.io
+        #     - GENESIS_URL=http://test.bcovrin.vonx.io/genesis
+            # - LEDGER_URL=${LEDGER_URL}
+            # - GENESIS_URL=${GENESIS_URL}
+        tty: true
+
+    acme-agent:
+
+        image: ghcr.io/openwallet-foundation/acapy-agent:py3.12-1.2-lts
+        command:
+            [
+            "start",
+            "--label", "Acme Agent",
+            "--inbound-transport", "http", "0.0.0.0", "8040",
+            "--outbound-transport", "http",
+            "--admin", "0.0.0.0", "8041",
+            "--admin-insecure-mode",
+            "--endpoint", "http://acme-agent:8040",
+            "--wallet-type", "askar",
+            "--wallet-name", "acme_wallet",
+            "--wallet-key", "acme_secret",
+            "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
+            "--auto-provision",
+            ]
+        
+        
+        # command: ['acme --port 8040 --aip 10']
+        # build:
+        #     context: https://github.com/hyperledger/aries-cloudagent-python.git#main
+        #     dockerfile: ./docker/Dockerfile.demo
+        ports:
+            - 8140:8040
+            - 8141:8041
+            # - 8040-8047:8040-8047
+        networks:
+            - aca
+        # enviroｓｓｓｓL=http://test.bcovrin.vonx.io/genesis
+            # - LEDGER_URL=${LEDGER_URL}
+            # - GENESIS_URL=${GENESIS_URL}
+        tty: true
+
+    # Controllers
+    faber-controller:
+        build:
+            context: /Users/chenyantong/Desktop/(try1)acapy-controllers/AliceFaberAcmeDemo/controllers/faber-controller
+        ports:
+            - 9021:80
+        networks:
+            - aca
+        depends_on:
+            - faber-agent
+        environment:
+            - RUNMODE=dev
+            - FABER_AGENT_HOST=faber-agent
+    alice-controller:
+        build:
+            context: /Users/chenyantong/Desktop/(try1)acapy-controllers/AliceFaberAcmeDemo/controllers/alice-controller/
+            args:
+                - RUNMODE=${RUNMODE}
+                - ALICE_AGENT_HOST=${ALICE_AGENT_HOST}
+        ports:
+            - 9031:80
+        networks:
+            - aca
+        depends_on:
+            - alice-agent
+    acme-controller:
+        build:
+            context: /Users/chenyantong/Desktop/(try1)acapy-controllers/AliceFaberAcmeDemo/controllers/acme-controller/
+        ports:
+            - 9041:3000
+        networks:
+            - aca
+        depends_on:
+            - acme-agent
+        environment:
+            - RUNMODE=dev
+            - ACME_AGENT_HOST=acme-agent
+
+networks:
+    aca:

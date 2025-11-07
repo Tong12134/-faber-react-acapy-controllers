@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Components\" />
+    <Folder Include="Models\" />
+    <Folder Include="Services\" />
+    <Folder Include="Components\Nav\" />
+    <Folder Include="Components\CardList\" />
+    <Folder Include="Components\Card\" />
+    <Folder Include="wwwroot\data\" />
+    <Folder Include="Connection\" />
+    <Folder Include="Connection\Components\" />
+    <Folder Include="Shared\Components\" />
+    <Folder Include="Shared\Components\ComponentNav\" />
+    <Folder Include="Enums\" />
+    <Folder Include="Schema\" />
+    <Folder Include="Schema\Components\" />
+    <Folder Include="Shared\Components\ObjectViewer\" />
+    <Folder Include="Definition\" />
+    <Folder Include="Definition\Components\" />
+    <Folder Include="Credential\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
+  </ItemGroup>
+</Project>
