@@ -11,7 +11,7 @@ export default function CredentialSchemasPage() {
   useEffect(() => {
     async function fetchSchemas() {
       try {
-        const res = await fetch("/api/schemas");
+        const res = await fetch("/api/credentialSchemas");
         const data = await res.json();
         if (data.ok) {
           setSchemas(data.schemaIds || []);
@@ -34,7 +34,7 @@ export default function CredentialSchemasPage() {
     setSelectedId(id);
     if (!id) return;
     try {
-      const res = await fetch(`/api/schemas/${encodeURIComponent(id)}`);
+      const res = await fetch(`/api/credentialSchemas/${encodeURIComponent(id)}`);
       const data = await res.json();
       if (data.ok) {
         setSchemaData(JSON.stringify(data.result, null, 2));

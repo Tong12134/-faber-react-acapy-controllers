@@ -1,7 +1,14 @@
 // server/src/acapy.js
 import axios from "axios";
+import dotenv from "dotenv";
 
-const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8031";
+dotenv.config();
+
+const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8021";
+console.log("[acapy] using agent base:", AGENT_BASE);
+
+
+
 
 /** 測試連線 */
 export async function ping() {
@@ -10,8 +17,13 @@ export async function ping() {
 
 /** 取得所有 Schemas */
 export async function getSchemas() {
-  const res = await axios.get(`${AGENT_BASE}/schemas/created`);
-  return res.data.schema_ids;
+  try {
+    const res = await axios.get(`${AGENT_BASE}/schemas/created`);
+    return res.data.schema_ids;
+  } catch (e) {
+    console.error("get schemas error:", e.message);
+    throw e;
+  }
 }
 
 /** 取得單一 Schema */
@@ -23,8 +35,13 @@ export async function getSchema(schemaId) {
 
 /** 取得所有 Connections */
 export async function getConnections() {
-  const res = await axios.get(`${AGENT_BASE}/connections`);
-  return res.data.results;
+  try {
+    const res = await axios.get(`${AGENT_BASE}/connections`);
+    return res.data.results;
+  } catch (e) {
+    console.error("get connections error:", e.message);
+    throw e;
+  }
 }
 
 /** 建立新的邀請 */

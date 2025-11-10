@@ -11,7 +11,8 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const ids = await acapy.getCredentialDefinitions();
-    res.json({ ok: true, credentialDefinitionIds: ids });
+    console.log(" ACA-Py returned IDs:", ids);
+    res.json({ ok: true, defIds: ids });
   } catch (err) {
     console.error("get definitions error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -24,7 +25,10 @@ router.get("/", async (req, res) => {
  */
 router.get("/:id", async (req, res) => {
   try {
-    const id = req.params.id;
+    const rawId = req.params.id;
+    const id = decodeURIComponent(rawId); 
+    //const id = req.params.id;
+    console.log("📩  Received definition ID:", id);
     const data = await acapy.getCredentialDefinition(id);
     res.json({ ok: true, result: data });
   } catch (err) {

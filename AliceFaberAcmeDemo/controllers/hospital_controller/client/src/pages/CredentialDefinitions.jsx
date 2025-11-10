@@ -11,13 +11,13 @@ export default function CredentialDefinitionsPage() {
   useEffect(() => {
     async function fetchDefinitions() {
       try {
-        const res = await fetch("/api/definitions");
+        const res = await fetch("/api/credentialDefinitions");
         const data = await res.json();
         if (data.ok) {
-          setDefinitions(data.credentialDefinitionIds || []);
+          setDefinitions(data.defIds || []);
         } else {
           throw new Error(data.error || "Load failed");
-        }
+        }   
       } catch (err) {
         console.error(err);
         setError(err.message);
@@ -31,11 +31,12 @@ export default function CredentialDefinitionsPage() {
   // 選擇 definition → 抓詳細資料
   const handleSelect = async (e) => {
     const id = e.target.value;
+    console.log("Selected definition ID:", id);
     setSelectedId(id);
     if (!id) return;
-
     try {
-      const res = await fetch(`/api/definitions/${encodeURIComponent(id)}`);
+        // encodeURIComponent 避免冒號出錯
+      const res = await fetch(`/api/credentialDefinitions/${encodeURIComponent(id)}`);
       const data = await res.json();
       if (data.ok) {
         setDefinitionData(JSON.stringify(data.result, null, 2));
