@@ -22,8 +22,13 @@ export default function AgentStatus({ showLabel = false }) {
     return () => clearInterval(timer);
   }, []);
 
-  const color = loading ? "gray" : isOnline ? "green" : "red";
-
+  const color = loading ? "#888" : isOnline ? "#00ff66"  : "#ff4d4f";
+  const glow = isOnline
+    ? "0 0 12px #00ff66"
+    : loading
+    ? "0 0 6px #aaa"
+    : "0 0 12px #ff4d4f";
+    
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {/* ✅ 放大狀態燈 */}

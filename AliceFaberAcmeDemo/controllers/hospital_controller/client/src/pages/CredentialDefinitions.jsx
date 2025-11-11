@@ -7,17 +7,18 @@ export default function CredentialDefinitionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // 初次載入：抓所有 definition IDs
+  // ✅ 初次載入：抓所有 Credential Definition IDs
   useEffect(() => {
     async function fetchDefinitions() {
       try {
         const res = await fetch("/api/credentialDefinitions");
         const data = await res.json();
         if (data.ok) {
-          setDefinitions(data.defIds || []);
+          // 根據你的後端回傳 key 改名
+          setDefinitions(data.credentialDefinitionIds || []);
         } else {
           throw new Error(data.error || "Load failed");
-        }   
+        }
       } catch (err) {
         console.error(err);
         setError(err.message);
@@ -28,14 +29,13 @@ export default function CredentialDefinitionsPage() {
     fetchDefinitions();
   }, []);
 
-  // 選擇 definition → 抓詳細資料
+  // ✅ 選擇 definition → 抓詳細資料
   const handleSelect = async (e) => {
     const id = e.target.value;
-    console.log("Selected definition ID:", id);
     setSelectedId(id);
     if (!id) return;
+
     try {
-        // encodeURIComponent 避免冒號出錯
       const res = await fetch(`/api/credentialDefinitions/${encodeURIComponent(id)}`);
       const data = await res.json();
       if (data.ok) {
@@ -49,36 +49,97 @@ export default function CredentialDefinitionsPage() {
     }
   };
 
-  if (loading) return <p>Loading definitions...</p>;
+  if (loading) return <p style={{ color: "#666" }}>Loading credential definitions...</p>;
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
 
   return (
-    <div className="container" style={{ maxWidth: "800px", padding: "20px" }}>
-      <h2>Credential Definitions</h2>
+    <div
+      style={{
+        backgroundColor: "#f8faff",
+        borderRadius: "12px",
+        padding: "24px",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+        minHeight: "70vh",
+      }}
+    >
+      {/* ✅ 標題 */}
+      <h2
+        style={{
+          color: "#003366",
+          borderBottom: "3px solid #cce0ff",
+          paddingBottom: "8px",
+          marginTop: "3px",
+          marginBottom: "20px",
+          fontWeight: 600,
+        }}
+      > Credential Definitions</h2>
 
-      <select
-        className="form-control mb-3"
-        value={selectedId}
-        onChange={handleSelect}
+      {/* ✅ 下拉選單區塊 */}
+      <div
+        style={{
+          backgroundColor: "white",
+          borderRadius: "8px",
+          padding: "16px",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+          marginBottom: "20px",
+        }}
       >
-        <option value="">Select a Credential Definition</option>
-        {definitions.map((defId) => (
-          <option key={defId} value={defId}>
-            {defId}
-          </option>
-        ))}
-      </select>
+        <label htmlFor="defSelect"
+        style={{
+            fontWeight: 500,
+            color: "#003366",
+            fontSize: "19px",
+            display: "block",
+            marginBottom: "8px",
+          }}>
+            Select a Credential Definition:
+        </label>
+        <select
+          id="defSelect"
+          className="form-control"
+          value={selectedId}
+          onChange={handleSelect}
+          style={{
+            width: "100%",
+            padding: "10px",
+            marginTop: "8px",
+            borderRadius: "6px",
+            border: "1px solid #ccd9ff",
+            outline: "none",
+            fontSize: "15px",
+          }}
+        >
+          <option value="">-- Select a Credential Definition --</option>
+          {definitions.map((defId) => (
+            <option key={defId} value={defId}>
+              {defId}
+            </option>
+          ))}
+        </select>
+      </div>
 
+      {/* ✅ 顯示 Definition 詳細資料 */}
       {definitionData && (
-        <div style={{ background: "#f5f5f5", padding: "10px", borderRadius: "6px" }}>
-          <h4>Definition Detail</h4>
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "16px",
+            borderRadius: "8px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+          }}
+        >
+          <h4 style={{ color: "#003366", marginBottom: "10px" }}>Definition Detail</h4>
           <pre
             style={{
-              maxHeight: "400px",
-              overflowY: "auto",
-              background: "#fff",
+              background: "#f5f7fa",
+              padding: "12px",
+              borderRadius: "6px",
               border: "1px solid #ddd",
-              padding: "10px",
+              overflowY: "auto",
+              maxHeight: "400px",
+              fontSize: "14px",
+              lineHeight: 1.5,
+              color: "#222",
             }}
           >
             {definitionData}

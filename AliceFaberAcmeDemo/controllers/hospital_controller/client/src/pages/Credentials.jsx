@@ -1,4 +1,3 @@
-// client/src/pages/CredentialsPage.jsx
 import { useState, useEffect } from "react";
 
 export default function CredentialsPage() {
@@ -25,7 +24,7 @@ export default function CredentialsPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  // 🔹 初始化 — 取得 Connections / Schemas / CredentialDefinitions
+  // 🔹 初始化
   useEffect(() => {
     async function fetchInit() {
       try {
@@ -48,12 +47,10 @@ export default function CredentialsPage() {
     fetchInit();
   }, []);
 
-  // 🔹 表單輸入更新
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // 🔹 驗證 JSON 格式
   const isValidJson = (text) => {
     try {
       JSON.parse(text);
@@ -63,7 +60,6 @@ export default function CredentialsPage() {
     }
   };
 
-  // 🔹 提交 Credential
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -88,8 +84,6 @@ export default function CredentialsPage() {
       const data = await res.json();
       if (data.ok) {
         setMessage("✅ Credential sent successfully!");
-        // 可導向其他頁面
-        // window.location.href = "/connections/active";
       } else {
         throw new Error(data.error || "Send failed");
       }
@@ -102,31 +96,73 @@ export default function CredentialsPage() {
   if (loading) return <p>Loading...</p>;
 
   return (
-    <div className="container" style={{ padding: "20px", maxWidth: "800px" }}>
-      <h2>Issue Credential</h2>
+    <div
+      style={{
+        backgroundColor: "#f8faff",
+        borderRadius: "12px",
+        padding: "24px",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+        minHeight: "70vh",
+      }}
+    >
+      {/*  頁面標題 */}
+      <h2
+        style={{
+          color: "#003366",
+          borderBottom: "3px solid #cce0ff",
+          paddingBottom: "8px",
+          marginTop: "3px",
+          marginBottom: "16px",
+          fontWeight: 600,
+        }}
+      > Issue Credential </h2>
 
+      {/*  狀態提示框 */}
       {message && (
         <div
           style={{
-            background: "#eee",
-            padding: "10px",
+            backgroundColor: message.startsWith("✅") ? "#e6ffe6" : "#fff4e6",
+            color: message.startsWith("✅") ? "#006600" : "#993300",
+            border: message.startsWith("✅")
+              ? "1px solid #66cc66"
+              : "1px solid #ffcc66",
             borderRadius: "8px",
-            marginBottom: "10px",
+            padding: "10px 16px",
+            marginBottom: "16px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
           }}
         >
           {message}
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      {/* ✅ 表單區塊 */}
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          backgroundColor: "white",
+          borderRadius: "8px",
+          padding: "24px",
+          boxShadow: "0 1px 5px rgba(0,0,0,0.1)",
+        }}
+      >
         {/* Connection */}
-        <div className="form-group">
-          <label>Connection</label>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+            Connection
+          </label>
           <select
-            className="form-control"
             value={form.ConnectionId}
             onChange={(e) => updateField("ConnectionId", e.target.value)}
             required
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "6px",
+              border: "1px solid #ccd9ff",
+              marginTop: "8px",
+              fontSize: "15px",
+            }}
           >
             <option value="">Select a connection</option>
             {connections.map((c) => (
@@ -138,13 +174,22 @@ export default function CredentialsPage() {
         </div>
 
         {/* Schema */}
-        <div className="form-group">
-          <label>Schema</label>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+            Schema
+          </label>
           <select
-            className="form-control"
             value={form.SchemaId}
             onChange={(e) => updateField("SchemaId", e.target.value)}
             required
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "6px",
+              border: "1px solid #ccd9ff",
+              marginTop: "8px",
+              fontSize: "15px",
+            }}
           >
             <option value="">Select a schema</option>
             {schemas.map((s) => (
@@ -156,15 +201,24 @@ export default function CredentialsPage() {
         </div>
 
         {/* Credential Definition */}
-        <div className="form-group">
-          <label>Credential Definition</label>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+            Credential Definition
+          </label>
           <select
-            className="form-control"
             value={form.CredentialDefinitionId}
             onChange={(e) =>
               updateField("CredentialDefinitionId", e.target.value)
             }
             required
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "6px",
+              border: "1px solid #ccd9ff",
+              marginTop: "8px",
+              fontSize: "15px",
+            }}
           >
             <option value="">Select a credential definition</option>
             {credDefs.map((d) => (
@@ -176,26 +230,57 @@ export default function CredentialsPage() {
         </div>
 
         {/* Attributes */}
-        <div className="form-group">
-          <label>Credential Attributes (JSON Array)</label>
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+            Credential Attributes (JSON Array)
+          </label>
           <textarea
-            className="form-control"
-            rows="8"
+            rows="12"
             value={form.CredentialAttributesObject}
             onChange={(e) =>
               updateField("CredentialAttributesObject", e.target.value)
             }
+            style={{
+              width: "100%",
+              height: "230px",
+              marginTop: "8px",
+              borderRadius: "6px",
+              border: "1px solid #ccd9ff",
+              padding: "10px",
+              fontFamily: "monospace",
+              fontSize: "14px",
+              backgroundColor: "#f9faff",
+              lineHeight: "1.5",
+              resize: "vertical", // 允許使用者拖拉改大小（上下）
+              boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)", // 內陰影，看起來更有層次
+            }}
           ></textarea>
           {!isValidJson(form.CredentialAttributesObject) && (
-            <p style={{ color: "red" }}>❌ Invalid JSON format</p>
+            <p style={{ color: "red", marginTop: "6px" }}> Invalid JSON format!</p>
           )}
         </div>
 
-        <button type="submit" className="btn btn-primary btn-lg btn-block">
+        {/* Submit Button */}
+        <button
+          type="submit"
+          style={{
+            width: "100%",
+            backgroundColor: "#003366",
+            color: "white",
+            fontSize: "16px",
+            fontWeight: "600",
+            padding: "12px",
+            borderRadius: "8px",
+            border: "none",
+            cursor: "pointer",
+            transition: "background-color 0.3s ease",
+          }}
+          onMouseOver={(e) => (e.target.style.backgroundColor = "#004b99")}
+          onMouseOut={(e) => (e.target.style.backgroundColor = "#003366")}
+        >
           Send Credential
         </button>
       </form>
     </div>
   );
 }
-

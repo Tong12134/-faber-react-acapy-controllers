@@ -33,9 +33,15 @@ export default function NewConnectionForm({ onCreated }) {
         className="btn btn-primary"
         onClick={handleCreate}
         disabled={creating}
+        style={{
+            fontSize: "13px",      
+            //padding: "10px 20px",  // ✅ 增加內距（按鈕變高一點）
+            fontWeight: 400,       // ✅ 稍微加粗
+        }}
       >
         {creating ? "Creating..." : "Create Invitation"}
       </button>
+
 
       {inviteUrl && (
         <div style={{ marginTop: 10 }}>
