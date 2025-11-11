@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export default function AgentStatus() {
+export default function AgentStatus({ showLabel = false }) {
   const [isOnline, setIsOnline] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -16,34 +16,34 @@ export default function AgentStatus() {
     }
   }
 
-  // 初次執行 + 每 5 秒檢查一次
   useEffect(() => {
     checkStatus();
     const timer = setInterval(checkStatus, 5000);
     return () => clearInterval(timer);
   }, []);
 
-  // 顯示狀態燈
   const color = loading ? "gray" : isOnline ? "green" : "red";
-  const label = loading
-    ? "Checking..."
-    : isOnline
-    ? "Agent Connected"
-    : "Agent Disconnected";
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {/* ✅ 放大狀態燈 */}
       <div
         style={{
-          width: 12,
-          height: 12,
+          width: 20,         
+          height: 20,         
           borderRadius: "50%",
           backgroundColor: color,
-          boxShadow: `0 0 5px ${color}`,
-          transition: "background-color 0.3s",
+          boxShadow: `0 0 8px ${color}`, // 陰影跟著變大
+          transition: "background-color 0.3s, box-shadow 0.3s",
         }}
       />
-      <span style={{ fontSize: 14, color: "#555" }}>{label}</span>
+
+      {/* ✅ 根據 showLabel 決定是否顯示文字（預設 false） */}
+      {showLabel && (
+        <span style={{ fontSize: 14, color: "#555" }}>
+          {isOnline ? "Connected" : "Disconnected"}
+        </span>
+      )}
     </div>
   );
 }
