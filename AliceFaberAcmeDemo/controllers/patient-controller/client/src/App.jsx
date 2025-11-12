@@ -2,15 +2,14 @@ import React, { useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import AgentStatus from "./components/AgentStatus.jsx";
 import Connections from "./pages/Connections.jsx";
-import CredentialSchemas from "./pages/CredentialSchemas.jsx";
-import CredentialDefinitions from "./pages/CredentialDefinitions.jsx";
+import ProofRequests from "./pages/ProofRequests.jsx";
 import Credentials from "./pages/Credentials.jsx";
 
 export default function App() {
   const location = useLocation();
 
   useEffect(() => {
-    document.title = "Hospital Controller";
+    document.title = "Patient Controller";
   }, []);
 
   const isHome = location.pathname === "/";
@@ -24,7 +23,7 @@ export default function App() {
         margin: "0 auto",
       }}
     >
-      {/* 標題列（深藍滿版） */}
+      {/*  標題列（深藍滿版） */}
       <header
         style={{
           display: "flex",
@@ -38,7 +37,6 @@ export default function App() {
           marginBottom: "25px",
         }}
       >
-        {/* 左邊標題 */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <Link
             to="/"
@@ -59,31 +57,30 @@ export default function App() {
                 cursor: "pointer",
               }}
             >
-              🏥 Hospital Controller
+              🧑‍💻 Patient Controller
             </h1>
           </Link>
         </div>
 
-        {/* 右邊狀態燈 */}
+        {/* 狀態燈 */}
         <AgentStatus showLabel={false} />
       </header>
 
-      {/* 導航列：首頁 vs 子頁面 顯示不同樣式 */}
+      {/*  導航列：首頁 vs 子頁面 顯示不同樣式 */}
       {isHome ? (
         // --- 首頁導航列（滿版、等寬） ---
         <nav
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "24px", // ← 稍微放寬間距
+            gap: "20px",
             margin: "20px 24px",
             marginBottom: "0px",
           }}
         >
           {[
             { to: "/connections", label: "Connections" },
-            { to: "/credentialSchemas", label: "Credential Schemas" },
-            { to: "/credentialDefinitions", label: "Credential Definitions" },
+            { to: "/proofRequests", label: "Proof Requests" },
             { to: "/credentials", label: "Credentials" },
           ].map(({ to, label }) => (
             <Link
@@ -123,7 +120,7 @@ export default function App() {
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "center",
-            gap: "28px",
+            gap: "24px",
             padding: "12px 36px",
             borderBottom: "2px solid #e6f0ff",
             backgroundColor: "#f9faff",
@@ -133,9 +130,8 @@ export default function App() {
           {[
             { to: "/", label: "Home" },
             { to: "/connections", label: "Connections" },
-            { to: "/credentialSchemas", label: "Credential Schemas" },
-            { to: "/credentialDefinitions", label: "Credential Definitions" },
             { to: "/credentials", label: "Credentials" },
+            { to: "/proofRequests", label: "Proof Requests" },
           ].map(({ to, label }) => {
             const isActive = location.pathname === to;
             return (
@@ -161,7 +157,7 @@ export default function App() {
         </nav>
       )}
 
-      {/* 主內容 */}
+      {/*  主內容 */}
       <main style={{ padding: "32px 40px" }}>
         <Routes>
           <Route
@@ -173,16 +169,12 @@ export default function App() {
                   color: "#333",
                 }}
               >
-                Welcome to Hospital Controller.
+                Welcome to Patient Controller.
               </p>
             }
           />
           <Route path="/connections" element={<Connections />} />
-          <Route path="/credentialSchemas" element={<CredentialSchemas />} />
-          <Route
-            path="/credentialDefinitions"
-            element={<CredentialDefinitions />}
-          />
+          <Route path="/proofRequests" element={<ProofRequests />} />
           <Route path="/credentials" element={<Credentials />} />
           <Route path="*" element={<p>404 - Page Not Found</p>} />
         </Routes>
