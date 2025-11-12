@@ -1,6 +1,0 @@
-<div class="card-columns">
-    <app-connection-card *ngFor="let connection of connections" [connection]="connection"
-        (remove)="onRemoveConnection($event)"></app-connection-card>
-</div>
-
-<app-empty-list *ngIf="!connections?.length"></app-empty-list>
