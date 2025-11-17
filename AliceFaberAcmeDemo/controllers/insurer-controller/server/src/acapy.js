@@ -4,13 +4,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8041";
+console.log("[acapy] using agent base:", AGENT_BASE);
 
-const AGENT_BASE =
-  process.env.AGENT_ADMIN_URL || // 建議你改用這個環境變數
-  process.env.AGENT_URL ||       // 兼容你原本的設定
-  "http://localhost:8141";       // 預設指向 admin port
-
-console.log(`[acapy] using agent base: ${AGENT_BASE}`);
 
 /** Agent Status */
 export async function ping() {
@@ -19,32 +15,49 @@ export async function ping() {
 
 /** Get all connections */
 export async function getConnections() {
-  const res = await axios.get(`${AGENT_BASE}/connections`);
-  return res.data.results || [];
+  try {
+    const res = await axios.get(`${AGENT_BASE}/connections`);
+    return res.data.results || [];
+  } catch (e) {
+    console.error(
+      "get connections error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    throw e;
+  }
 }
 
 /**  DID Exchange：建立 Invitation（給前端用來產 QRCode） */
 export async function createInvitation(options = {}) {
   try {
+    const body = {
+      auto_accept: true,
+      // 使用 DIDExchange 1.1 handshakes
+      handshake_protocols: ["https://didcomm.org/didexchange/1.1"],
+      // 如果之後要支援多用 / 附加 attachment，可以從 options 傳進來
+      ...options,
+    };
+
     const res = await axios.post(
-      `${AGENT_BASE}/connections/create-invitation`,
+      `${AGENT_BASE}/out-of-band/create-invitation`,
+      body,
       {
-        auto_accept: true, // 需要的話可以改成 false
-        ...options,
+        headers: { "Content-Type": "application/json" },
       }
     );
 
-    // ACA-Py 回傳格式：
+    // 回傳格式通常是：
     // {
-    //   "connection_id": "...",
     //   "invitation": { ... },
-    //   "invitation_url": "didcomm://..."
+    //   "invitation_url": "https://..."
+    //   "trace": false,
+    //   "out_of_band_id": "..."
     // }
-
     return res.data;
   } catch (err) {
     console.error(
-      "ACA-Py /create-invitation error:",
+      "ACA-Py /out-of-band/create-invitation error:",
       err.response?.status,
       err.response?.data || err.message
     );
@@ -53,7 +66,7 @@ export async function createInvitation(options = {}) {
 }
 
 /**
- * （保留，但目前 Mode A 不會用到）
+ * 
  * Indy Static Connection：需要 theirSeed 或 theirDid+theirVerkey
  */
 export async function createStaticConnection({
@@ -76,7 +89,10 @@ export async function createStaticConnection({
   }
 
   try {
-    const res = await axios.post(`${AGENT_BASE}/connections/create-static`, body);
+    const res = await axios.post(
+      `${AGENT_BASE}/connections/create-static`,
+      body
+    );
     return res.data;
   } catch (err) {
     console.error(
@@ -88,17 +104,37 @@ export async function createStaticConnection({
   }
 }
 
+
 /** Receive invitation（另一端收到 invitation 時使用） */
 export async function receiveInvitation(invite) {
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/out-of-band/receive-invitation`,
+      invite,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /out-of-band/receive-invitation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
+
+/** 接受特定邀請 */
+export async function acceptInvitation(connectionId) {
   const res = await axios.post(
-    `${AGENT_BASE}/connections/receive-invitation`,
-    invite,
-    {
-      headers: { "Content-Type": "application/json" },
-    }
+    `${AGENT_BASE}/connections/${connectionId}/accept-invitation`
   );
   return res.data;
 }
+
 
 /** Remove connection */
 export async function removeConnection(id) {

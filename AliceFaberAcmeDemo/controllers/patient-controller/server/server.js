@@ -11,6 +11,9 @@ import proofs from "./src/routes.proofs.js";
 import webhooks from "./src/webhooks.js";
 import * as acapy from "./src/acapy.js";
 
+console.log("[SERVER] I am", process.env.SERVICE_NAME || "unknown");
+console.log("[SERVER] AGENT_URL =", process.env.AGENT_URL);
+
 dotenv.config();
 const app = express();
 app.use(cors());

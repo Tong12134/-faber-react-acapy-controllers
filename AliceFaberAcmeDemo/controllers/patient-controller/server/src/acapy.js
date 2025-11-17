@@ -1,43 +1,88 @@
+// server/src/acapy.js
 import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8131"; // Patient agent port
-console.log(`[acapy] using agent base: ${AGENT_BASE}`);
+const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8031";
+console.log("[acapy] using agent base:", AGENT_BASE);
 
-
-/** 測試 Agent 連線狀態 */
+/** 測試連線 */
 export async function ping() {
-  return axios.get(`${AGENT_BASE}/status`);
+  const res = await axios.get(`${AGENT_BASE}/status`);
+  return res.data;
 }
 
-/** 取得所有連線 */
-export async function getConnections() {
+/** 取得所有 Schemas */
+export async function getSchemas() {
   try {
-    const res = await axios.get(`${AGENT_BASE}/connections`);
-    return res.data.results;
+    const res = await axios.get(`${AGENT_BASE}/schemas/created`);
+    return res.data.schema_ids;
   } catch (e) {
-    console.error("get connections error:", e.message);
+    console.error("get schemas error:", e.message);
     throw e;
   }
 }
 
-/**  DID Exchange：建立 Invitation（給前端用來產 QRCode） */
+/** 取得單一 Schema */
+export async function getSchema(schemaId) {
+  const res = await axios.get(`${AGENT_BASE}/schemas/${schemaId}`);
+  return res.data;
+}
+
+/** 取得所有 Connections */
+export async function getConnections() {
+  try {
+    const res = await axios.get(`${AGENT_BASE}/connections`);
+    return res.data.results || [];
+  } catch (e) {
+    console.error(
+      "get connections error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    throw e;
+  }
+}
+
+/** 取得單一連線 */
+export async function getConnection(connectionId) {
+  const res = await axios.get(`${AGENT_BASE}/connections/${connectionId}`);
+  return res.data;
+}
+
+/**
+ * 建立 Invitation（給前端用來產 QRCode）
+ */
 export async function createInvitation(options = {}) {
   try {
+    const body = {
+      auto_accept: true,
+      // 使用 DIDExchange 1.1 handshakes
+      handshake_protocols: ["https://didcomm.org/didexchange/1.1"],
+      // 如果之後要支援多用 / 附加 attachment，可以從 options 傳進來
+      ...options,
+    };
+
     const res = await axios.post(
-      `${AGENT_BASE}/connections/create-invitation`,
+      `${AGENT_BASE}/out-of-band/create-invitation`,
+      body,
       {
-        auto_accept: true, // 需要的話可以改成 false
-        ...options,
+        headers: { "Content-Type": "application/json" },
       }
     );
 
+    // 回傳格式通常是：
+    // {
+    //   "invitation": { ... },
+    //   "invitation_url": "https://..."
+    //   "trace": false,
+    //   "out_of_band_id": "..."
+    // }
     return res.data;
   } catch (err) {
     console.error(
-      "ACA-Py /create-invitation error:",
+      "ACA-Py /out-of-band/create-invitation error:",
       err.response?.status,
       err.response?.data || err.message
     );
@@ -45,35 +90,101 @@ export async function createInvitation(options = {}) {
   }
 }
 
-/** 接收邀請 */
+export async function createStaticConnection({
+  theirSeed,
+  theirDid,
+  theirVerkey,
+  theirLabel = "Patient Agent",
+} = {}) {
+  const body = { their_label: theirLabel };
+
+  if (theirSeed) {
+    body.their_seed = theirSeed;
+  } else if (theirDid && theirVerkey) {
+    body.their_did = theirDid;
+    body.their_verkey = theirVerkey;
+  } else {
+    throw new Error(
+      "createStaticConnection 需要 either theirSeed 或 (theirDid + theirVerkey)"
+    );
+  }
+
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/connections/create-static`,
+      body
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /create-static error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
+/** Receive invitation（另一端收到 invitation 時使用） */
 export async function receiveInvitation(invite) {
-  const res = await axios.post(`${AGENT_BASE}/connections/receive-invitation`, invite, 
-    {
-      headers: { "Content-Type": "application/json" },
-    } );
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/out-of-band/receive-invitation`,
+      invite,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /out-of-band/receive-invitation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
+
+/** 接受特定邀請 */
+export async function acceptInvitation(connectionId) {
+  const res = await axios.post(
+    `${AGENT_BASE}/connections/${connectionId}/accept-invitation`
+  );
   return res.data;
 }
 
-
-/** 取得 Credentials */
-export async function getCredentials() {
-  const res = await axios.get(`${AGENT_BASE}/credentials`);
-  return res.data.results;
+/** 發送 Credential */
+export async function sendCredential(credentialJson) {
+  const res = await axios.post(
+    `${AGENT_BASE}/issue-credential/send`,
+    credentialJson,
+    {
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+  return res.data;
 }
 
-/** Proofs（驗證資料） */
-export async function getProofs() {
-  const res = await axios.get(`${AGENT_BASE}/present-proof/records`);
-  return res.data.results;
+/** 取得所有 Credential Definitions */
+export async function getCredentialDefinitions() {
+  const res = await axios.get(
+    `${AGENT_BASE}/credential-definitions/created`
+  );
+  return res.data.credential_definition_ids;
 }
 
-/** 發送 Proof Request（請求驗證） */
-export async function sendProofRequest(payload) {
-  const res = await axios.post(`${AGENT_BASE}/present-proof/send-request`, payload);
+/** 取得單一 Credential Definition 詳細資料 */
+export async function getCredentialDefinition(defId) {
+  const res = await axios.get(
+    `${AGENT_BASE}/credential-definitions/${defId}`
+  );
   return res.data;
 }
 
 /** Remove connection */
 export async function removeConnection(id) {
-  return axios.post(`${AGENT_BASE}/connections/${id}/remove`);
+  const res = await axios.post(`${AGENT_BASE}/connections/${id}/remove`);
+  return res.data;
 }

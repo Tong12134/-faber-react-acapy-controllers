@@ -8,14 +8,20 @@ export default function ConnectionsPage() {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  //  取得連線資料
+  // 取得連線資料
   const fetchConnections = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/connections");
       const data = await res.json();
       if (data.ok) {
-        setConnections(data.results || []);
+        // 🔹 這裡加排序：依 updated_at（或 created_at）新到舊
+        const sorted = [...(data.results || [])].sort((a, b) => {
+          const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
+          const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
+          return bTime - aTime; // 新的在上面
+        });
+        setConnections(sorted);
       } else {
         alert("❌ Failed to load connections: " + data.error);
       }
@@ -58,7 +64,7 @@ export default function ConnectionsPage() {
         Connections
       </h2>
 
-      {/*  Tabs */}
+      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -94,7 +100,7 @@ export default function ConnectionsPage() {
         ))}
       </div>
 
-      {/*  Connected Tab */}
+      {/* Connected Tab */}
       {activeTab === "connected" && (
         <div>
           <h4
@@ -135,7 +141,7 @@ export default function ConnectionsPage() {
         </div>
       )}
 
-      {/*  Awaiting Tab */}
+      {/* Awaiting Tab */}
       {activeTab === "awaiting" && (
         <div>
           <h4
@@ -174,7 +180,7 @@ export default function ConnectionsPage() {
         </div>
       )}
 
-      {/*  Create Tab */}
+      {/* Create Tab */}
       {activeTab === "create" && (
         <div
           style={{
@@ -198,7 +204,7 @@ export default function ConnectionsPage() {
         </div>
       )}
 
-      {/*  Accept Tab */}
+      {/* Accept Tab */}
       {activeTab === "accept" && (
         <div
           style={{
@@ -218,7 +224,13 @@ export default function ConnectionsPage() {
           >
             📨 Accept Invitation
           </h4>
-          <AcceptConnectionForm onAccepted={fetchConnections} />
+          <AcceptConnectionForm
+            onAccepted={() => {
+              // 🔹 接受成功後：重抓連線 + 切回 Connected Tab
+              fetchConnections();
+              setActiveTab("connected");
+            }}
+          />
         </div>
       )}
     </div>

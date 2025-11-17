@@ -4,13 +4,14 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8121";
+// Faber Admin API：在這個 demo 裡是 8021
+const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8021";
 console.log("[acapy] using agent base:", AGENT_BASE);
-
 
 /** 測試連線 */
 export async function ping() {
-  return axios.get(`${AGENT_BASE}/status`);
+  const res = await axios.get(`${AGENT_BASE}/status`);
+  return res.data;
 }
 
 /** 取得所有 Schemas */
@@ -30,14 +31,17 @@ export async function getSchema(schemaId) {
   return res.data;
 }
 
-
 /** 取得所有 Connections */
 export async function getConnections() {
   try {
     const res = await axios.get(`${AGENT_BASE}/connections`);
-    return res.data.results;
+    return res.data.results || [];
   } catch (e) {
-    console.error("get connections error:", e.message);
+    console.error(
+      "get connections error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
     throw e;
   }
 }
@@ -48,22 +52,38 @@ export async function getConnection(connectionId) {
   return res.data;
 }
 
-
-/**  DID Exchange：建立 Invitation（給前端用來產 QRCode） */
+/**
+ * 建立 Invitation（給前端用來產 QRCode）
+ */
 export async function createInvitation(options = {}) {
   try {
+    const body = {
+      auto_accept: true,
+      // 使用 DIDExchange 1.1 handshakes
+      handshake_protocols: ["https://didcomm.org/didexchange/1.1"],
+      // 如果之後要支援多用 / 附加 attachment，可以從 options 傳進來
+      ...options,
+    };
+
     const res = await axios.post(
-      `${AGENT_BASE}/connections/create-invitation`,
+      `${AGENT_BASE}/out-of-band/create-invitation`,
+      body,
       {
-        auto_accept: true, // 需要的話可以改成 false
-        ...options,
+        headers: { "Content-Type": "application/json" },
       }
     );
 
+    // 回傳格式通常是：
+    // {
+    //   "invitation": { ... },
+    //   "invitation_url": "https://..."
+    //   "trace": false,
+    //   "out_of_band_id": "..."
+    // }
     return res.data;
   } catch (err) {
     console.error(
-      "ACA-Py /create-invitation error:",
+      "ACA-Py /out-of-band/create-invitation error:",
       err.response?.status,
       err.response?.data || err.message
     );
@@ -91,7 +111,10 @@ export async function createStaticConnection({
   }
 
   try {
-    const res = await axios.post(`${AGENT_BASE}/connections/create-static`, body);
+    const res = await axios.post(
+      `${AGENT_BASE}/connections/create-static`,
+      body
+    );
     return res.data;
   } catch (err) {
     console.error(
@@ -105,9 +128,39 @@ export async function createStaticConnection({
 
 /** Receive invitation（另一端收到 invitation 時使用） */
 export async function receiveInvitation(invite) {
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/out-of-band/receive-invitation`,
+      invite,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /out-of-band/receive-invitation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
+
+/** 接受特定邀請 */
+export async function acceptInvitation(connectionId) {
   const res = await axios.post(
-    `${AGENT_BASE}/connections/receive-invitation`,
-    invite,
+    `${AGENT_BASE}/connections/${connectionId}/accept-invitation`
+  );
+  return res.data;
+}
+
+/** 發送 Credential */
+export async function sendCredential(credentialJson) {
+  const res = await axios.post(
+    `${AGENT_BASE}/issue-credential/send`,
+    credentialJson,
     {
       headers: { "Content-Type": "application/json" },
     }
@@ -115,34 +168,24 @@ export async function receiveInvitation(invite) {
   return res.data;
 }
 
-/** 接受特定邀請 */
-export async function acceptInvitation(connectionId) {
-  const res = await axios.post(`${AGENT_BASE}/connections/${connectionId}/accept-invitation`);
-  return res.data;
-}
-
-/** 發送 Credential */
-export async function sendCredential(credentialJson) {
-  const res = await axios.post(`${AGENT_BASE}/issue-credential/send`, credentialJson);
-  return res.data;
-}
-
 /** 取得所有 Credential Definitions */
 export async function getCredentialDefinitions() {
-  const res = await axios.get(`${AGENT_BASE}/credential-definitions/created`);
+  const res = await axios.get(
+    `${AGENT_BASE}/credential-definitions/created`
+  );
   return res.data.credential_definition_ids;
 }
 
 /** 取得單一 Credential Definition 詳細資料 */
 export async function getCredentialDefinition(defId) {
-  const res = await axios.get(`${AGENT_BASE}/credential-definitions/${defId}`);
+  const res = await axios.get(
+    `${AGENT_BASE}/credential-definitions/${defId}`
+  );
   return res.data;
 }
 
-
 /** Remove connection */
 export async function removeConnection(id) {
-  return axios.post(`${AGENT_BASE}/connections/${id}/remove`);
+  const res = await axios.post(`${AGENT_BASE}/connections/${id}/remove`);
+  return res.data;
 }
-
-

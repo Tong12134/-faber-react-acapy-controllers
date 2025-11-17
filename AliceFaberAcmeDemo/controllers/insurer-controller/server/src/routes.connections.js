@@ -4,40 +4,24 @@ import * as acapy from "./acapy.js";
 
 const router = express.Router();
 
-/**
- * GET /api/connections
- * 取得所有連線
- * （假設在主程式是 app.use("/api/connections", router)）
- */
+/** Get connections */
 router.get("/", async (req, res) => {
   try {
     const results = await acapy.getConnections();
     res.json({ ok: true, results });
   } catch (err) {
-    console.error("get connections error:", err.message);
+    console.error("GET /api/connections error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-/**
- * POST /api/connections/create-invitation
- * Mode A: DID Exchange – 建立 Invitation 給前端產 QRCode
- */
+/** Create invitation（Out-of-Band 邀請） */
 router.post("/create-invitation", async (req, res) => {
   try {
-    // 🔹 這裡改成呼叫 DID Exchange 的 createInvitation
-    const data = await acapy.createInvitation();
-
-    // ACA-Py 回傳的大致格式：
-    // {
-    //   "connection_id": "...",
-    //   "invitation": { ... },
-    //   "invitation_url": "didcomm://..."
-    // }
+    const data = await acapy.createInvitation(); // ← 改成用新的 OOB 版本
 
     res.json({
       ok: true,
-      connection_id: data.connection_id,
       invitation: data.invitation,
       invitation_url: data.invitation_url,
     });
@@ -47,10 +31,7 @@ router.post("/create-invitation", async (req, res) => {
   }
 });
 
-/**
- * POST /api/connections/receive-invitation
- * 由另一個 Agent 端使用 invitation 物件建立連線
- */
+/** Receive invitation */
 router.post("/receive-invitation", async (req, res) => {
   try {
     const d = await acapy.receiveInvitation(req.body);
@@ -61,16 +42,13 @@ router.post("/receive-invitation", async (req, res) => {
   }
 });
 
-/**
- * POST /api/connections/:id/remove
- * 刪除連線
- */
+/** Remove connection */
 router.post("/:id/remove", async (req, res) => {
   try {
     await acapy.removeConnection(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    console.error("remove connection error:", err.message);
+    console.error("remove-connection error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

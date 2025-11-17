@@ -1,19 +1,23 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function AcceptConnectionForm({ onAccepted }) {
   const [inviteJson, setInviteJson] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // 從 invitation URL 中解析出 JSON（支援 ?c_i=...）
+  // 從 invitation URL 中解析出 JSON（支援 ?oob=... 或 ?c_i=...）
   const extractJsonFromUrl = (urlString) => {
     try {
       const url = new URL(urlString.trim());
-      const c_i = url.searchParams.get("c_i");
-      if (!c_i) return null;
+
+      // 🔹 先找新版 OOB 的 oob，找不到再找舊版 connections 的 c_i
+      const encoded = url.searchParams.get("oob") || url.searchParams.get("c_i");
+      if (!encoded) return null;
 
       // base64url → base64
-      let b64 = c_i.replace(/-/g, "+").replace(/_/g, "/");
+      let b64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
       while (b64.length % 4 !== 0) {
         b64 += "=";
       }
@@ -35,7 +39,7 @@ export default function AcceptConnectionForm({ onAccepted }) {
         return;
       }
       payload = decoded;
-      setInviteJson(decoded); // 也同步顯示在上面的 textarea
+      setInviteJson(decoded); // 同步顯示在上面的 textarea，方便你看到內容
     }
 
     if (!payload) {
@@ -48,14 +52,20 @@ export default function AcceptConnectionForm({ onAccepted }) {
       const res = await fetch("/api/connections/receive-invitation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: payload, // 和你原本一樣：直接把 JSON 字串送出去
+        // 和你原本一樣：直接把 JSON 字串送出去
+        body: payload,
       });
       const data = await res.json();
       if (data.ok) {
-        alert("✅ Invitation accepted successfully");
+        // ✅ 不再只是 alert，改成：
+        // 1. 通知父層刷新（如果有傳 onAccepted）
+        // 2. 導向到 Connected 列表頁
         onAccepted && onAccepted();
         setInviteJson("");
         setInviteUrl("");
+
+        // 這邊假設你的連線列表 route 是 /connections
+        navigate("/connections");
       } else {
         alert("❌ Error: " + data.error);
       }
@@ -68,7 +78,6 @@ export default function AcceptConnectionForm({ onAccepted }) {
 
   return (
     <div style={{ marginBottom: 25 }}>
-
       {/* Paste invitation object block */}
       <div style={{ marginBottom: "15px" }}>
         <label
@@ -119,7 +128,7 @@ export default function AcceptConnectionForm({ onAccepted }) {
           type="text"
           value={inviteUrl}
           onChange={(e) => setInviteUrl(e.target.value)}
-          placeholder="例如：http://insurer-agent:8040?c_i=eyJAdHlwZ..."
+          placeholder="例如：http://insurer-agent:8040?oob=eyJAdHlwZ... 或 ?c_i=eyJAdHlwZ..."
           style={{
             width: "100%",
             borderRadius: "8px",

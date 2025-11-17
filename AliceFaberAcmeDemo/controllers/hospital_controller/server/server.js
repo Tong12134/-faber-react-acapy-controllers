@@ -12,6 +12,9 @@ import credentialDefinitions from "./src/routes.credentialDefinitions.js";
 import credentials from "./src/routes.credentials.js";
 import webhooks from "./src/webhooks.js";
 
+console.log("[SERVER] I am", process.env.SERVICE_NAME || "unknown");
+console.log("[SERVER] AGENT_URL =", process.env.AGENT_URL);
+
 dotenv.config();
 const app = express();
 app.use(cors());
