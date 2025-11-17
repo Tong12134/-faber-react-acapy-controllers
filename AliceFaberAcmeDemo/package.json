@@ -1,0 +1,10 @@
+{
+  "name": "acapy-multi-controller",
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "scripts": {
+    "dev-all": "concurrently --names \"HS,HC,IS,IC,PS,PC\" -c \"bgBlue.bold,bgBlue,bgGreen.bold,bgGreen,bgMagenta.bold,bgMagenta\" \"cd controllers/hospital_controller/server && npm run dev\" \"cd controllers/hospital_controller/client && npm run dev\" \"cd controllers/insurer-controller/server && npm run dev\" \"cd controllers/insurer-controller/client && npm run dev\" \"cd controllers/patient-controller/server && npm run dev\" \"cd controllers/patient-controller/client && npm run dev\""
+  }
+}
