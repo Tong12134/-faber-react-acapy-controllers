@@ -18,34 +18,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-/**
- * POST /api/connections/create-invitation
- * 建立新的連線邀請（對應 /connections/create-invitation）
- */
-router.post("/create-invitation", async (req, res) => {
-  try {
-    const data = await acapy.createInvitation();
-    res.json({ ok: true, ...data });
-  } catch (err) {
-    console.error("create invitation error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-/**
- * POST /api/connections/receive-invitation
- * 接受邀請連線（對應 /connections/receive-invitation）
- */
-router.post("/receive-invitation", async (req, res) => {
-  try {
-    const invitation = req.body;
-    const data = await acapy.receiveInvitation(invitation);
-    res.json({ ok: true, ...data });
-  } catch (err) {
-    console.error("receive invitation error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
 
 /**
  * GET /api/connections/:id
@@ -62,6 +34,50 @@ router.get("/:id", async (req, res) => {
 });
 
 /**
+ * POST /api/connections/create-invitation
+ * 建立新的連線邀請（對應 /connections/create-invitation）
+ */
+router.post("/create-invitation", async (req, res) => {
+  try {
+    //  這裡呼叫 DID Exchange 的 createInvitation
+    const data = await acapy.createInvitation();
+
+    // ACA-Py 回傳的大致格式：
+    // {
+    //   "connection_id": "...",
+    //   "invitation": { ... },
+    //   "invitation_url": "didcomm://..."
+    // }
+
+    res.json({
+      ok: true,
+      connection_id: data.connection_id,
+      invitation: data.invitation,
+      invitation_url: data.invitation_url,
+    });
+  } catch (err) {
+    console.error("create-invitation error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/connections/receive-invitation
+ * 接受邀請連線（對應 /connections/receive-invitation）
+ * 由另一個 Agent 端使用 invitation 物件建立連線
+ */
+router.post("/receive-invitation", async (req, res) => {
+  try {
+    const d = await acapy.receiveInvitation(req.body);
+    res.json({ ok: true, data: d });
+  } catch (err) {
+    console.error("receive-invitation error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
+/**
  * POST /api/connections/:id/accept-invitation
  * 接受某一筆邀請（對應 /connections/{id}/accept-invitation）
  */
@@ -74,5 +90,20 @@ router.post("/:id/accept-invitation", async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+/**
+ * POST /api/connections/:id/remove
+ * 刪除連線
+ */
+router.post("/:id/remove", async (req, res) => {
+  try {
+    await acapy.removeConnection(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("remove connection error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 
 export default router;

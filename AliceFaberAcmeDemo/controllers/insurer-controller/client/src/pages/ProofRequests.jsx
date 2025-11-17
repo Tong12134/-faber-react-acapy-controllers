@@ -10,7 +10,7 @@ export default function ProofRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  // 🧩 抓取 Proof 紀錄
+  //  抓取 Proof 紀錄
   const fetchProofs = async () => {
     setLoading(true);
     try {
@@ -26,7 +26,7 @@ export default function ProofRequestsPage() {
     }
   };
 
-  // 🧩 抓取 Connections
+  //  抓取 Connections
   const fetchConnections = async () => {
     try {
       const res = await fetch("/api/connections");
@@ -42,7 +42,7 @@ export default function ProofRequestsPage() {
     fetchConnections();
   }, []);
 
-  // 🧩 發送 Proof Request
+  //  發送 Proof Request
   const sendProofRequest = async () => {
     try {
       if (!connectionId) {
@@ -104,7 +104,7 @@ export default function ProofRequestsPage() {
         minHeight: "70vh",
       }}
     >
-      {/* ✅ 頁面標題 */}
+      {/*  頁面標題 */}
       <h2
         style={{
           color: "#003366",
@@ -113,13 +113,13 @@ export default function ProofRequestsPage() {
           marginTop: "3px",
           marginBottom: "20px",
           fontWeight: 600,
-          fontSize: "25px",
+          fontSize: "28px",
         }}
       >
         Proof Requests
       </h2>
 
-      {/* ✅ Tabs */}
+      {/*  Tabs */}
       <div
         style={{
           display: "flex",
@@ -149,7 +149,7 @@ export default function ProofRequestsPage() {
         ))}
       </div>
 
-      {/* 🧾 Proofs 列表 */}
+      {/*  Proofs 列表 */}
       {activeTab === "proofs" && (
         <div>
           {loading ? (
@@ -197,7 +197,7 @@ export default function ProofRequestsPage() {
         </div>
       )}
 
-      {/* 🧰 Request Proof 表單 */}
+      {/*  Request Proof 表單 */}
       {activeTab === "request" && (
         <div
           style={{
@@ -207,7 +207,7 @@ export default function ProofRequestsPage() {
             boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
           }}
         >
-          <h4 style={{ color: "#003366", marginBottom: "12px" }}>
+          <h4 style={{ color: "#003366", marginBottom: "12px" ,marginTop: "5px", fontSize: "20px", fontWeight: 600}}>
             Request Proof
           </h4>
 
@@ -261,21 +261,21 @@ export default function ProofRequestsPage() {
             value={proofRequestJson}
             onChange={(e) => setProofRequestJson(e.target.value)}
             placeholder={`{
-  "connection_id": "<Enter a valid Connection ID>",
-  "proof_request": {
-    "name": "Proof of Insurance Eligibility",
-    "version": "1.0",
-    "requested_attributes": {
-      "0_name_uuid": {
-        "name": "name",
-        "restrictions": [
-          { "cred_def_id": "<Enter a valid Credential Definition ID>" }
-        ]
-      }
-    },
-    "requested_predicates": {}
-  }
-}`}
+              "connection_id": "<Enter a valid Connection ID>",
+              "proof_request": {
+                "name": "Proof of Insurance Eligibility",
+                "version": "1.0",
+                "requested_attributes": {
+                  "0_name_uuid": {
+                    "name": "name",
+                    "restrictions": [
+                      { "cred_def_id": "<Enter a valid Credential Definition ID>" }
+                    ]
+                  }
+                },
+                "requested_predicates": {}
+              }
+            }`}
             style={{
               width: "100%",
               padding: "10px",

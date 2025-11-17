@@ -4,10 +4,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8021";
+const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8121";
 console.log("[acapy] using agent base:", AGENT_BASE);
-
-
 
 
 /** 測試連線 */
@@ -44,21 +42,76 @@ export async function getConnections() {
   }
 }
 
-/** 建立新的邀請 */
-export async function createInvitation() {
-  const res = await axios.post(`${AGENT_BASE}/connections/create-invitation`, {});
-  return res.data;
-}
-
-/** 接受邀請連線 */
-export async function receiveInvitation(invitationJson) {
-  const res = await axios.post(`${AGENT_BASE}/connections/receive-invitation`, invitationJson);
-  return res.data;
-}
-
 /** 取得單一連線 */
 export async function getConnection(connectionId) {
   const res = await axios.get(`${AGENT_BASE}/connections/${connectionId}`);
+  return res.data;
+}
+
+
+/**  DID Exchange：建立 Invitation（給前端用來產 QRCode） */
+export async function createInvitation(options = {}) {
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/connections/create-invitation`,
+      {
+        auto_accept: true, // 需要的話可以改成 false
+        ...options,
+      }
+    );
+
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /create-invitation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
+export async function createStaticConnection({
+  theirSeed,
+  theirDid,
+  theirVerkey,
+  theirLabel = "Patient Agent",
+} = {}) {
+  const body = { their_label: theirLabel };
+
+  if (theirSeed) {
+    body.their_seed = theirSeed;
+  } else if (theirDid && theirVerkey) {
+    body.their_did = theirDid;
+    body.their_verkey = theirVerkey;
+  } else {
+    throw new Error(
+      "createStaticConnection 需要 either theirSeed 或 (theirDid + theirVerkey)"
+    );
+  }
+
+  try {
+    const res = await axios.post(`${AGENT_BASE}/connections/create-static`, body);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /create-static error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
+/** Receive invitation（另一端收到 invitation 時使用） */
+export async function receiveInvitation(invite) {
+  const res = await axios.post(
+    `${AGENT_BASE}/connections/receive-invitation`,
+    invite,
+    {
+      headers: { "Content-Type": "application/json" },
+    }
+  );
   return res.data;
 }
 
@@ -84,6 +137,12 @@ export async function getCredentialDefinitions() {
 export async function getCredentialDefinition(defId) {
   const res = await axios.get(`${AGENT_BASE}/credential-definitions/${defId}`);
   return res.data;
+}
+
+
+/** Remove connection */
+export async function removeConnection(id) {
+  return axios.post(`${AGENT_BASE}/connections/${id}/remove`);
 }
 
 
