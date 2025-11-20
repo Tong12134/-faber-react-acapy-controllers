@@ -1,18 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 export default function AcceptConnectionForm({ onAccepted }) {
   const [inviteJson, setInviteJson] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   // 從 invitation URL 中解析出 JSON（支援 ?oob=... 或 ?c_i=...）
   const extractJsonFromUrl = (urlString) => {
     try {
       const url = new URL(urlString.trim());
 
-      // 🔹 先找新版 OOB 的 oob，找不到再找舊版 connections 的 c_i
+      // 先找新版 OOB 的 oob，找不到再找舊版 connections 的 c_i
       const encoded = url.searchParams.get("oob") || url.searchParams.get("c_i");
       if (!encoded) return null;
 
@@ -39,7 +37,7 @@ export default function AcceptConnectionForm({ onAccepted }) {
         return;
       }
       payload = decoded;
-      setInviteJson(decoded); // 同步顯示在上面的 textarea，方便你看到內容
+      setInviteJson(decoded); // 同步顯示在上面的 textarea
     }
 
     if (!payload) {
@@ -52,20 +50,27 @@ export default function AcceptConnectionForm({ onAccepted }) {
       const res = await fetch("/api/connections/receive-invitation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 和你原本一樣：直接把 JSON 字串送出去
-        body: payload,
+        body: payload, // 直接送 JSON 字串給後端
       });
       const data = await res.json();
       if (data.ok) {
-        // ✅ 不再只是 alert，改成：
-        // 1. 通知父層刷新（如果有傳 onAccepted）
-        // 2. 導向到 Connected 列表頁
-        onAccepted && onAccepted();
+        // 從後端回應抓 connection_id
+        // 後端格式是 { ok: true, data: <acapy 回來的物件> }
+        const conn =
+          data.data ||
+          data.connection ||
+          data.record ||
+          null;
+        const connId =
+          conn?.connection_id ||
+          conn?.connection?.connection_id ||
+          null;
+
+        // 把這次的 connection_id 傳給外面（ConnectionsPage）
+        onAccepted && onAccepted(connId);
+
         setInviteJson("");
         setInviteUrl("");
-
-        // 這邊假設你的連線列表 route 是 /connections
-        navigate("/connections");
       } else {
         alert("❌ Error: " + data.error);
       }

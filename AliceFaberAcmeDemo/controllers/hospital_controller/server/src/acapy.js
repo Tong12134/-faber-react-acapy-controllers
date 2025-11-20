@@ -186,6 +186,16 @@ export async function getCredentialDefinition(defId) {
 
 /** Remove connection */
 export async function removeConnection(id) {
-  const res = await axios.post(`${AGENT_BASE}/connections/${id}/remove`);
-  return res.data;
+  try {
+    const res = await axios.delete(`${AGENT_BASE}/connections/${id}`);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /connections/{id} DELETE error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
 }
+

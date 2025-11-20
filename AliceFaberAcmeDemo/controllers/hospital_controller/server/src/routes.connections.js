@@ -48,9 +48,10 @@ router.post("/:id/remove", async (req, res) => {
     await acapy.removeConnection(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    console.error("remove-connection error:", err.message);
+    console.error("[HS] remove-connection error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 
 export default router;

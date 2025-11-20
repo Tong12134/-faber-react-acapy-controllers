@@ -138,5 +138,15 @@ export async function acceptInvitation(connectionId) {
 
 /** Remove connection */
 export async function removeConnection(id) {
-  return axios.post(`${AGENT_BASE}/connections/${id}/remove`);
+  try {
+    const res = await axios.delete(`${AGENT_BASE}/connections/${id}`);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /connections/{id} DELETE error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
 }

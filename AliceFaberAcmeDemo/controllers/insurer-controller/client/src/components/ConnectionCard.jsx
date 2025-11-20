@@ -12,6 +12,29 @@ export default function ConnectionCard({ connection, onRefresh }) {
     error: "#b91c1c",
   }[state] || "#6b7280";
 
+  // 🔹 刪除連線
+  const handleRemove = async () => {
+    const ok = window.confirm(
+      `確定要刪除此連線嗎？\n\nconnection_id: ${connection_id}`
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/connections/${connection_id}/remove`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // 刪除成功後請父層重新載入列表
+        onRefresh && onRefresh();
+      } else {
+        alert("❌ Failed to remove connection: " + (data.error || "Unknown"));
+      }
+    } catch (err) {
+      alert("Network error while removing connection: " + err.message);
+    }
+  };
+
   return (
     <div
       style={{
@@ -72,17 +95,49 @@ export default function ConnectionCard({ connection, onRefresh }) {
       </div>
       <div style={{ color: "#444", fontSize: "14px", marginBottom: "4px" }}>
         <strong>Created:</strong>{" "}
-        {new Date(created_at).toLocaleString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
+        {created_at
+          ? new Date(created_at).toLocaleString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-"}
       </div>
 
       {/* 動作列 */}
-      <div style={{ marginTop: "12px", textAlign: "right" }}>
+      <div
+        style={{
+          marginTop: "12px",
+          textAlign: "right",
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: "8px",
+        }}
+      >
+        {/* Delete 按鈕 */}
+        <button
+          onClick={handleRemove}
+          style={{
+            backgroundColor: "#b91c1c",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            padding: "6px 12px",
+            fontSize: "14px",
+            cursor: "pointer",
+            fontWeight: 500,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+            transition: "all 0.2s ease",
+          }}
+          onMouseOver={(e) => (e.target.style.backgroundColor = "#dc2626")}
+          onMouseOut={(e) => (e.target.style.backgroundColor = "#b91c1c")}
+        >
+          🗑 Delete
+        </button>
+
+        {/* 原本的 Refresh 按鈕 */}
         <button
           onClick={onRefresh}
           style={{
