@@ -34,4 +34,38 @@ router.post("/send", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/credentials
+ * 取得已儲存的 credentials，並附上 issuer DID + 名稱
+ */
+router.get("/", async (req, res) => {
+  try {
+    const rawCreds = await acapy.getCredentials();
+
+    const ISSUER_LABELS = {
+      "QWTxizRo9A1tWdEPYkFPHe": "Hospital",
+    };
+
+    const credentials = rawCreds.map((c) => {
+      const issuerDid = (c.cred_def_id || "").split(":")[0];
+      const issuerLabel = ISSUER_LABELS[issuerDid] || "Unknown Issuer";
+
+      return {
+        id: c.cred_id || c.referent,
+        schemaId: c.schema_id,
+        credDefId: c.cred_def_id,
+        issuerDid,
+        issuerLabel,
+        attrs: c.attrs || {},
+      };
+    });
+
+    res.json({ ok: true, credentials });
+  } catch (err) {
+    console.error("[/api/credentials] error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 export default router;

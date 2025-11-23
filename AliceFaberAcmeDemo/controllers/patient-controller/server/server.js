@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 
 import connections from "./src/routes.connections.js";
 import credentials from "./src/routes.credentials.js";
+import credentialOffers from "./src/routes.credentialOffers.js";
 import proofs from "./src/routes.proofs.js";
 import webhooks from "./src/webhooks.js";
 import * as acapy from "./src/acapy.js";
@@ -36,6 +37,7 @@ app.get("/api/agent/status", async (req, res) => {
 app.use("/api/connections", connections);
 app.use("/api/credentials", credentials);
 app.use("/api/proofs", proofs);
+app.use("/api/credentialOffers", credentialOffers); 
 
 // Webhooks（需在 ACA-Py 啟動時指定）
 app.post("/webhooks/topic/:topic", webhooks);

@@ -4,8 +4,13 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Faber Admin API：在這個 demo 裡是 8021
-const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8021";
+// Faber Admin API：在這個 demo 裡是 8121 / 本地Agent 8021
+const AGENT_HOST = process.env.FABER_AGENT_HOST || "localhost";
+const AGENT_ADMIN_PORT = process.env.AGENT_ADMIN_PORT || "8021";
+
+const AGENT_BASE =
+  process.env.AGENT_URL || `http://${AGENT_HOST}:${AGENT_ADMIN_PORT}`;
+
 console.log("[acapy] using agent base:", AGENT_BASE);
 
 /** 測試連線 */
@@ -13,6 +18,66 @@ export async function ping() {
   const res = await axios.get(`${AGENT_BASE}/status`);
   return res.data;
 }
+
+/** 確保 Hospital 專用的 Schema 與 Cred Def 已建立 */
+export async function ensureHospitalSchemaAndCredDef() {
+  const SCHEMA_NAME = "HospitalDiagnosisV2";
+  const SCHEMA_VERSION = "2.0.0";
+  const ATTRIBUTES = ["name", "date", "degree", "birthdate_dateint", "timestamp"];
+
+  // 現在用一個自訂的 tag，之後如果 wallet 又被砍掉，就改成 hospital-02, -03 ...
+  const TAG = "hospital-02";
+
+  // 1) 先找 schema 有沒有在 ledger 上
+  const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
+  let schemaId = (createdSchemas.data.schema_ids || []).find((id) =>
+    id.includes(`:${SCHEMA_NAME}:${SCHEMA_VERSION}`)
+  );
+
+  if (!schemaId) {
+    const res = await axios.post(
+      `${AGENT_BASE}/schemas`,
+      {
+        schema_name: SCHEMA_NAME,
+        schema_version: SCHEMA_VERSION,
+        attributes: ATTRIBUTES,
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    schemaId = res.data.schema_id;
+    console.log("[INIT] created schema:", schemaId);
+  } else {
+    console.log("[INIT] schema already exists:", schemaId);
+  }
+
+  // 2) 再看這個 wallet 裡，有沒有我們指定 TAG 的 cred def
+  const createdDefs = await axios.get(
+    `${AGENT_BASE}/credential-definitions/created`
+  );
+  let credDefId = (createdDefs.data.credential_definition_ids || []).find(
+    (id) => id.endsWith(`:${TAG}`)
+  );
+
+  if (!credDefId) {
+    // 這個 wallet 裡沒有，就新建一個
+    const res = await axios.post(
+      `${AGENT_BASE}/credential-definitions`,
+      {
+        schema_id: schemaId,
+        tag: TAG,
+        support_revocation: false,
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    credDefId = res.data.credential_definition_id;
+    console.log("[INIT] created cred def:", credDefId);
+  } else {
+    console.log("[INIT] cred def already exists:", credDefId);
+  }
+
+  return { schemaId, credDefId };
+}
+
 
 /** 取得所有 Schemas */
 export async function getSchemas() {
@@ -30,6 +95,31 @@ export async function getSchema(schemaId) {
   const res = await axios.get(`${AGENT_BASE}/schemas/${schemaId}`);
   return res.data;
 }
+
+
+/** 建立 Schema */
+export async function createSchema({ name, version, attributes }) {
+  if (!name || !version || !Array.isArray(attributes) || attributes.length === 0) {
+    throw new Error("createSchema 需要 name、version 與至少一個 attributes");
+  }
+
+  try {
+    const res = await axios.post(`${AGENT_BASE}/schemas`, {
+      schema_name: name,
+      schema_version: version,
+      attributes,
+    });
+    return res.data; // 內含 schema_id
+  } catch (err) {
+    console.error(
+      "ACA-Py /schemas error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
 
 /** 取得所有 Connections */
 export async function getConnections() {
@@ -157,16 +247,31 @@ export async function acceptInvitation(connectionId) {
 }
 
 /** 發送 Credential */
+/** 發送 Credential（Issue V1） */
 export async function sendCredential(credentialJson) {
-  const res = await axios.post(
-    `${AGENT_BASE}/issue-credential/send`,
-    credentialJson,
-    {
-      headers: { "Content-Type": "application/json" },
-    }
-  );
-  return res.data;
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/issue-credential/send`,
+      credentialJson
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /issue-credential/send error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    // 丟回更有資訊的錯誤字串，前端就不會只看到「Request failed with status code 400」
+    throw new Error(detail);
+  }
 }
+
 
 /** 取得所有 Credential Definitions */
 export async function getCredentialDefinitions() {
@@ -183,6 +288,42 @@ export async function getCredentialDefinition(defId) {
   );
   return res.data;
 }
+
+/** 建立 Credential Definition */
+export async function createCredentialDefinition({
+  schemaId,
+  tag = "default",
+  supportRevocation = false,
+}) {
+  if (!schemaId) {
+    throw new Error("createCredentialDefinition 需要 schemaId");
+  }
+
+  try {
+    const res = await axios.post(`${AGENT_BASE}/credential-definitions`, {
+      schema_id: schemaId,
+      tag,
+      support_revocation: supportRevocation,
+    });
+    return res.data; // 內含 credential_definition_id
+    } catch (err) {
+    console.error(
+      "ACA-Py /credential-definitions error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    // 把 ACA-Py 回傳的 body 變成字串丟回去，方便前端 / curl 看
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
+}
+
+
 
 /** Remove connection */
 export async function removeConnection(id) {

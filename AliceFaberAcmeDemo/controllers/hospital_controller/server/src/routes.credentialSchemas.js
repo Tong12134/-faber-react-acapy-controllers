@@ -33,4 +33,29 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/schemas
+ * 建立一個新的 Schema
+ * body: { name: string, version: string, attributes: string[] }
+ */
+router.post("/", async (req, res) => {
+  try {
+    const { name, version, attributes } = req.body;
+
+    if (!name || !version || !Array.isArray(attributes) || attributes.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "name、version、attributes 為必填，且 attributes 需為非空陣列",
+      });
+    }
+
+    const data = await acapy.createSchema({ name, version, attributes });
+    res.json({ ok: true, result: data });
+  } catch (err) {
+    console.error("create schema error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 export default router;

@@ -37,4 +37,36 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/definitions
+ * 建立新的 Credential Definition
+ * body: { schemaId: string, tag?: string, supportRevocation?: boolean }
+ */
+router.post("/", async (req, res) => {
+  try {
+    const {
+      schemaId,
+      tag = "default",
+      supportRevocation = false,
+    } = req.body;
+
+    if (!schemaId) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "schemaId 為必填" });
+    }
+
+    const data = await acapy.createCredentialDefinition({
+      schemaId,
+      tag,
+      supportRevocation,
+    });
+
+    res.json({ ok: true, result: data });
+  } catch (err) {
+    console.error("create definition error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 export default router;

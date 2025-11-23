@@ -4,9 +4,8 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import * as acapy from "./src/acapy.js";
+import { ensureHospitalSchemaAndCredDef } from "./src/acapy.js";
 import connections from "./src/routes.connections.js";
-// import issue from "./src/routes.issue.js";
-// import verify from "./src/routes.verify.js";
 import credentialSchemas from "./src/routes.credentialSchemas.js";
 import credentialDefinitions from "./src/routes.credentialDefinitions.js";
 import credentials from "./src/routes.credentials.js";
@@ -48,4 +47,14 @@ app.post("/webhooks/topic/:topic", webhooks);
 // );
 
 const PORT = process.env.PORT || 5050;
-app.listen(PORT, () => console.log(`[hospital-controller] listening on :${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`[hospital-controller] listening on :${PORT}`);
+
+  try {
+    const { schemaId, credDefId } = await ensureHospitalSchemaAndCredDef();
+    console.log("[hospital-controller] Ready with schema:", schemaId);
+    console.log("[hospital-controller] Ready with cred def:", credDefId);
+  } catch (e) {
+    console.error("[hospital-controller] schema init error:", e.message);
+  }
+});
