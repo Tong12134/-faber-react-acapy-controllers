@@ -1,18 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 export default function AcceptConnectionForm({ onAccepted }) {
   const [inviteJson, setInviteJson] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   // 從 invitation URL 中解析出 JSON（支援 ?oob=... 或 ?c_i=...）
   const extractJsonFromUrl = (urlString) => {
     try {
       const url = new URL(urlString.trim());
 
-      // 🔹 先找新版 OOB 的 oob，找不到再找舊版 connections 的 c_i
+      // 先找新版 OOB 的 oob，找不到再找舊版 connections 的 c_i
       const encoded = url.searchParams.get("oob") || url.searchParams.get("c_i");
       if (!encoded) return null;
 
@@ -39,7 +37,7 @@ export default function AcceptConnectionForm({ onAccepted }) {
         return;
       }
       payload = decoded;
-      setInviteJson(decoded); // 同步顯示在上面的 textarea，方便你看到內容
+      setInviteJson(decoded); // 同步顯示在上面的 textarea
     }
 
     if (!payload) {
@@ -52,28 +50,35 @@ export default function AcceptConnectionForm({ onAccepted }) {
       const res = await fetch("/api/connections/receive-invitation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 和你原本一樣：直接把 JSON 字串送出去
         body: payload,
       });
       const data = await res.json();
       if (data.ok) {
-        // ✅ 不再只是 alert，改成：
-        // 1. 通知父層刷新（如果有傳 onAccepted）
-        // 2. 導向到 Connected 列表頁
-        onAccepted && onAccepted();
-        setInviteJson("");
-        setInviteUrl("");
+        const conn =
+          data.data ||
+          data.connection ||
+          data.record ||
+          null;
+        const connId =
+          conn?.connection_id ||
+          conn?.connection?.connection_id ||
+          null;
 
-        // 這邊假設你的連線列表 route 是 /connections
-        navigate("/connections");
+        onAccepted && onAccepted(connId);
+
+        //  成功的情況：不把 loading 設回 false，讓按鈕一直維持 Accepting...
+        // 反正通常 onAccepted 會跳轉頁面，這個 component 會被 unmount
+        return;
       } else {
         alert("❌ Error: " + data.error);
       }
     } catch (err) {
       alert("Invalid JSON or network error: " + err.message);
-    } finally {
-      setLoading(false);
     }
+
+    // 只有「失敗」才會走到這裡，把 loading 設回 false
+    setLoading(false);
+
   };
 
   return (
@@ -142,32 +147,35 @@ export default function AcceptConnectionForm({ onAccepted }) {
         />
       </div>
 
-      <button
-        onClick={handleAccept}
-        disabled={loading}
-        style={{
-          marginTop: "16px",
-          width: "100%",
-          backgroundColor: "#2d6a4f",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          padding: "12px 20px",
-          fontSize: "17px",
-          cursor: loading ? "not-allowed" : "pointer",
-          fontWeight: 500,
-          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-          transition: "all 0.2s ease",
-        }}
-        onMouseOver={(e) => {
-          if (!loading) e.target.style.backgroundColor = "#40916c";
-        }}
-        onMouseOut={(e) => {
-          e.target.style.backgroundColor = "#2d6a4f";
-        }}
-      >
-        {loading ? "Accepting..." : "Accept"}
+        <button
+          onClick={handleAccept}
+          disabled={loading}
+          style={{
+            marginTop: "16px",
+            width: "100%",
+            backgroundColor: "#2d6a4f",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            padding: "12px 20px",
+            fontSize: "17px",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: 500,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+            transition: "all 0.2s ease",
+            opacity: loading ? 0.7 : 1,          // ← 新增：Accepting 時變淡
+          }}
+          onMouseOver={(e) => {
+            if (!loading) e.target.style.backgroundColor = "#40916c"; // ← loading 中就不變色
+          }}
+          onMouseOut={(e) => {
+            e.target.style.backgroundColor = "#2d6a4f";
+          }}
+        >
+          {loading ? "Accepting..." : "Accept"}
       </button>
+
     </div>
   );
 }
+

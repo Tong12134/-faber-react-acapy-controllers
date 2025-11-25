@@ -80,7 +80,10 @@ services:
         "--wallet-name", "acme_wallet",
         "--wallet-key", "acme_secret",
         "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
-        "--auto-provision"
+        "--auto-provision",
+        "--auto-accept-invites",
+        "--auto-accept-requests",
+
       ]
     volumes:
       - acme_wallet_data:/home/aries/.aca-py

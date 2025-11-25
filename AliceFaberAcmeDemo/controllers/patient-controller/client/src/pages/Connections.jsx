@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ConnectionCard from "../components/ConnectionCard";
 import NewConnectionForm from "../components/NewConnectionForm";
 import AcceptConnectionForm from "../components/AcceptConnectionForm";
@@ -7,34 +7,56 @@ export default function ConnectionsPage() {
   const [activeTab, setActiveTab] = useState("connected");
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [justAcceptedId, setJustAcceptedId] = useState(null); // ⬅️ 剛接受的那條 connection_id
 
   // 取得連線資料
-  const fetchConnections = async () => {
-    setLoading(true);
+  const fetchConnections = useCallback(async () => {
     try {
       const res = await fetch("/api/connections");
       const data = await res.json();
       if (data.ok) {
-        // 🔹 這裡加排序：依 updated_at（或 created_at）新到舊
         const sorted = [...(data.results || [])].sort((a, b) => {
           const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
           const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
-          return bTime - aTime; // 新的在上面
+          return bTime - aTime;
         });
+
         setConnections(sorted);
+
+        // 🔍 如果有「剛接受的那一條」，而且它已經變成 active，就切到 Connected
+        if (justAcceptedId) {
+          const found = sorted.find(
+            (c) => c.connection_id === justAcceptedId && c.state === "active"
+          );
+          if (found) {
+            setActiveTab("connected");
+            setJustAcceptedId(null); // 只切一次，之後就不再觸發
+          }
+        }
       } else {
-        alert("❌ Failed to load connections: " + data.error);
+        console.error("Failed to load connections:", data.error);
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchConnections error:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [justAcceptedId]);
 
+  // 初次載入
   useEffect(() => {
+    setLoading(true);
     fetchConnections();
-  }, []);
+  }, [fetchConnections]);
+
+  // 🔁 定期輪詢，讓 state 變 active 時自動更新畫面
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchConnections();
+    }, 5000); // 每 5 秒更新一次
+
+    return () => clearInterval(intervalId);
+  }, [fetchConnections]);
 
   const activeConnections = connections.filter((c) => c.state === "active");
   const pendingConnections = connections.filter((c) => c.state !== "active");
@@ -133,7 +155,10 @@ export default function ConnectionsPage() {
                     borderLeft: "4px solid #33cc66",
                   }}
                 >
-                  <ConnectionCard connection={c} onRefresh={fetchConnections} />
+                  <ConnectionCard
+                    connection={c}
+                    onRefresh={fetchConnections}
+                  />
                 </div>
               ))}
             </div>
@@ -172,7 +197,10 @@ export default function ConnectionsPage() {
                     borderLeft: "4px solid #999",
                   }}
                 >
-                  <ConnectionCard connection={c} onRefresh={fetchConnections} />
+                  <ConnectionCard
+                    connection={c}
+                    onRefresh={fetchConnections}
+                  />
                 </div>
               ))}
             </div>
@@ -225,10 +253,14 @@ export default function ConnectionsPage() {
             📨 Accept Invitation
           </h4>
           <AcceptConnectionForm
-            onAccepted={() => {
-              // 🔹 接受成功後：重抓連線 + 切回 Connected Tab
+            onAccepted={(connId) => {
+              // 記住這次接受的是哪一條
+              if (connId) {
+                setJustAcceptedId(connId);
+              }
+              // 先抓一次最新連線（可能還是 pending）
               fetchConnections();
-              setActiveTab("connected");
+              // 保持在 accept tab，不切到 awaiting
             }}
           />
         </div>

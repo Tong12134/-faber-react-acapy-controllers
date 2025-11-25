@@ -50,12 +50,10 @@ export default function AcceptConnectionForm({ onAccepted }) {
       const res = await fetch("/api/connections/receive-invitation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: payload, // 直接送 JSON 字串給後端
+        body: payload,
       });
       const data = await res.json();
       if (data.ok) {
-        // 從後端回應抓 connection_id
-        // 後端格式是 { ok: true, data: <acapy 回來的物件> }
         const conn =
           data.data ||
           data.connection ||
@@ -66,19 +64,21 @@ export default function AcceptConnectionForm({ onAccepted }) {
           conn?.connection?.connection_id ||
           null;
 
-        // 把這次的 connection_id 傳給外面（ConnectionsPage）
         onAccepted && onAccepted(connId);
 
-        setInviteJson("");
-        setInviteUrl("");
+        //  成功的情況：不把 loading 設回 false，讓按鈕一直維持 Accepting...
+        // 反正通常 onAccepted 會跳轉頁面，這個 component 會被 unmount
+        return;
       } else {
         alert("❌ Error: " + data.error);
       }
     } catch (err) {
       alert("Invalid JSON or network error: " + err.message);
-    } finally {
-      setLoading(false);
     }
+
+    // 只有「失敗」才會走到這裡，把 loading 設回 false
+    setLoading(false);
+
   };
 
   return (
@@ -147,32 +147,35 @@ export default function AcceptConnectionForm({ onAccepted }) {
         />
       </div>
 
-      <button
-        onClick={handleAccept}
-        disabled={loading}
-        style={{
-          marginTop: "16px",
-          width: "100%",
-          backgroundColor: "#2d6a4f",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          padding: "12px 20px",
-          fontSize: "17px",
-          cursor: loading ? "not-allowed" : "pointer",
-          fontWeight: 500,
-          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-          transition: "all 0.2s ease",
-        }}
-        onMouseOver={(e) => {
-          if (!loading) e.target.style.backgroundColor = "#40916c";
-        }}
-        onMouseOut={(e) => {
-          e.target.style.backgroundColor = "#2d6a4f";
-        }}
-      >
-        {loading ? "Accepting..." : "Accept"}
+        <button
+          onClick={handleAccept}
+          disabled={loading}
+          style={{
+            marginTop: "16px",
+            width: "100%",
+            backgroundColor: "#2d6a4f",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            padding: "12px 20px",
+            fontSize: "17px",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: 500,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+            transition: "all 0.2s ease",
+            opacity: loading ? 0.7 : 1,          // ← 新增：Accepting 時變淡
+          }}
+          onMouseOver={(e) => {
+            if (!loading) e.target.style.backgroundColor = "#40916c"; // ← loading 中就不變色
+          }}
+          onMouseOut={(e) => {
+            e.target.style.backgroundColor = "#2d6a4f";
+          }}
+        >
+          {loading ? "Accepting..." : "Accept"}
       </button>
+
     </div>
   );
 }
+

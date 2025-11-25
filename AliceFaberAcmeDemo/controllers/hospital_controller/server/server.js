@@ -25,12 +25,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.get("/api/health", (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 app.get("/api/agent/status", async (req, res) => {
   try {
-    const r = await acapy.ping();
-    res.json({ ok: true, data: r.data });
+    const data = await acapy.ping();
+    res.json({ ok: true, data });
   } catch (e) {
     res.status(503).json({ ok: false, error: e.message });
   }
 });
+
 
 app.use("/api/connections", connections);
 app.use("/api/credentialSchemas", credentialSchemas);

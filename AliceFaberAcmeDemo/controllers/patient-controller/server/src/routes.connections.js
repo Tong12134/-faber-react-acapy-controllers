@@ -42,6 +42,17 @@ router.post("/receive-invitation", async (req, res) => {
   }
 });
 
+/** Accept DIDExchange request */
+router.post("/:id/accept-request", async (req, res) => {
+  try {
+    const d = await acapy.acceptRequest(req.params.id);
+    res.json({ ok: true, data: d });
+  } catch (err) {
+    console.error("accept-request error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 /** Remove connection */
 router.post("/:id/remove", async (req, res) => {
   try {

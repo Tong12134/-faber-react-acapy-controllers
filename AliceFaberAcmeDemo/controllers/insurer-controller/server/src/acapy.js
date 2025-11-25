@@ -4,16 +4,22 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const AGENT_BASE = process.env.AGENT_URL || "http://localhost:8041";
+const AGENT_HOST = process.env.FABER_AGENT_HOST || "localhost";
+const AGENT_ADMIN_PORT = process.env.AGENT_ADMIN_PORT || "8141";
+
+const AGENT_BASE =
+  process.env.AGENT_URL || `http://${AGENT_HOST}:${AGENT_ADMIN_PORT}`;
+
 console.log("[acapy] using agent base:", AGENT_BASE);
 
-
-/** Agent Status */
+/** 測試連線 */
 export async function ping() {
-  return axios.get(`${AGENT_BASE}/status`);
+  const res = await axios.get(`${AGENT_BASE}/status`);
+  return res.data;
 }
 
-/** Get all connections */
+
+/** 取得所有 Connections */
 export async function getConnections() {
   try {
     const res = await axios.get(`${AGENT_BASE}/connections`);
@@ -28,7 +34,15 @@ export async function getConnections() {
   }
 }
 
-/**  DID Exchange：建立 Invitation（給前端用來產 QRCode） */
+/** 取得單一連線 */
+export async function getConnection(connectionId) {
+  const res = await axios.get(`${AGENT_BASE}/connections/${connectionId}`);
+  return res.data;
+}
+
+/**
+ * 建立 Invitation（給前端用來產 QRCode）
+ */
 export async function createInvitation(options = {}) {
   try {
     const body = {
@@ -65,10 +79,6 @@ export async function createInvitation(options = {}) {
   }
 }
 
-/**
- * 
- * Indy Static Connection：需要 theirSeed 或 theirDid+theirVerkey
- */
 export async function createStaticConnection({
   theirSeed,
   theirDid,
@@ -104,7 +114,6 @@ export async function createStaticConnection({
   }
 }
 
-
 /** Receive invitation（另一端收到 invitation 時使用） */
 export async function receiveInvitation(invite) {
   try {
@@ -135,6 +144,14 @@ export async function acceptInvitation(connectionId) {
   return res.data;
 }
 
+export async function acceptRequest(connectionId) {
+  const res = await axios.post(
+    `${AGENT_BASE}/didexchange/${connectionId}/accept-request`
+  );
+  return res.data;
+}
+
+
 
 /** Remove connection */
 export async function removeConnection(id) {
@@ -150,3 +167,4 @@ export async function removeConnection(id) {
     throw new Error(err.response?.data?.error || err.message);
   }
 }
+

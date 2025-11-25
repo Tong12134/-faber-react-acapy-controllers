@@ -15,6 +15,17 @@ router.get("/", async (req, res) => {
   }
 });
 
+/** Accept DIDExchange request */
+router.post("/:id/accept-request", async (req, res) => {
+  try {
+    const d = await acapy.acceptRequest(req.params.id);
+    res.json({ ok: true, data: d });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 /** Create invitation（Out-of-Band 邀請） */
 router.post("/create-invitation", async (req, res) => {
   try {

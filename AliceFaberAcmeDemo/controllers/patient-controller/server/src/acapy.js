@@ -295,3 +295,9 @@ export async function acceptCredentialOffer(credExId) {
   }
 }
 
+export async function acceptRequest(connectionId) {
+  const res = await axios.post(
+    `${AGENT_BASE}/didexchange/${connectionId}/accept-request`
+  );
+  return res.data;
+}

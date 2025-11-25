@@ -19,16 +19,15 @@ export async function ping() {
   return res.data;
 }
 
+
 /** 確保 Hospital 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureHospitalSchemaAndCredDef() {
   const SCHEMA_NAME = "HospitalDiagnosisV2";
   const SCHEMA_VERSION = "2.0.0";
   const ATTRIBUTES = ["name", "date", "degree", "birthdate_dateint", "timestamp"];
+  const TAG = "hospital-03"; 
 
-  // 現在用一個自訂的 tag，之後如果 wallet 又被砍掉，就改成 hospital-02, -03 ...
-  const TAG = "hospital-02";
-
-  // 1) 先找 schema 有沒有在 ledger 上
+  // 1) 先找 schema
   const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
   let schemaId = (createdSchemas.data.schema_ids || []).find((id) =>
     id.includes(`:${SCHEMA_NAME}:${SCHEMA_VERSION}`)
@@ -45,38 +44,54 @@ export async function ensureHospitalSchemaAndCredDef() {
       { headers: { "Content-Type": "application/json" } }
     );
     schemaId = res.data.schema_id;
-    console.log("[INIT] created schema:", schemaId);
+    console.log("[HS] [INIT] created schema:", schemaId);
   } else {
-    console.log("[INIT] schema already exists:", schemaId);
+    console.log("[HS] [INIT] schema already exists:", schemaId);
   }
 
-  // 2) 再看這個 wallet 裡，有沒有我們指定 TAG 的 cred def
-  const createdDefs = await axios.get(
-    `${AGENT_BASE}/credential-definitions/created`
-  );
-  let credDefId = (createdDefs.data.credential_definition_ids || []).find(
-    (id) => id.endsWith(`:${TAG}`)
-  );
-
-  if (!credDefId) {
-    // 這個 wallet 裡沒有，就新建一個
-    const res = await axios.post(
-      `${AGENT_BASE}/credential-definitions`,
-      {
-        schema_id: schemaId,
-        tag: TAG,
-        support_revocation: false,
-      },
-      { headers: { "Content-Type": "application/json" } }
+  // 2) 找 cred def
+  try {
+    const createdDefs = await axios.get(
+      `${AGENT_BASE}/credential-definitions/created`
     );
-    credDefId = res.data.credential_definition_id;
-    console.log("[INIT] created cred def:", credDefId);
-  } else {
-    console.log("[INIT] cred def already exists:", credDefId);
-  }
+    let credDefId = (createdDefs.data.credential_definition_ids || []).find(
+      (id) => id.endsWith(`:${TAG}`)
+    );
 
-  return { schemaId, credDefId };
+    if (!credDefId) {
+      const res = await axios.post(
+        `${AGENT_BASE}/credential-definitions`,
+        {
+          schema_id: schemaId,
+          tag: TAG,
+          support_revocation: false,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      credDefId = res.data.credential_definition_id;
+      console.log("[HS] [INIT] created cred def:", credDefId);
+    } else {
+      console.log("[HS] [INIT] cred def already exists:", credDefId);
+    }
+
+    return { schemaId, credDefId };
+  } catch (err) {
+    console.error(
+      "[HS] [INIT] cred def error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    // 把 ACA-Py 回傳內容包進錯誤字串往外丟，server 那邊就看得到細節
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
 }
+
 
 
 /** 取得所有 Schemas */
@@ -323,8 +338,6 @@ export async function createCredentialDefinition({
   }
 }
 
-
-
 /** Remove connection */
 export async function removeConnection(id) {
   try {
@@ -340,3 +353,19 @@ export async function removeConnection(id) {
   }
 }
 
+/** DIDExchange：邀請方接受 request */
+export async function acceptRequest(connectionId) {
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/didexchange/${connectionId}/accept-request`
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py accept-request error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
