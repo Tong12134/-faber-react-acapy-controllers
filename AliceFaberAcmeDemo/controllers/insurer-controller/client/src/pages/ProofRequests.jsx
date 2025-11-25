@@ -1,18 +1,54 @@
 import { useState, useEffect } from "react";
 
+// 依目前選到的 connectionId / credentialDefId，組出 textarea 要顯示的 JSON
+const buildProofRequestJson = (connectionId, credentialDefId) => {
+  const credDef =
+    credentialDefId && credentialDefId.trim()
+      ? credentialDefId.trim()
+      : "<Enter a valid Credential Definition ID>";
+
+  const conn =
+    connectionId && connectionId.trim()
+      ? connectionId.trim()
+      : "<Enter a valid Connection ID>";
+
+  const obj = {
+    connection_id: conn,
+    proof_request: {
+      name: "Proof of Hospital Diagnosis",
+      version: "1.0",
+      requested_attributes: {
+        attr1_name: {
+          name: "name",
+          restrictions: [
+            {
+              cred_def_id: credDef,
+            },
+          ],
+        },
+      },
+      requested_predicates: {},
+    },
+  };
+
+  return JSON.stringify(obj, null, 2);
+};
+
 export default function ProofRequestsPage() {
   const [activeTab, setActiveTab] = useState("proofs");
   const [proofs, setProofs] = useState([]);
   const [connections, setConnections] = useState([]);
   const [credentialDefId, setCredentialDefId] = useState("");
   const [connectionId, setConnectionId] = useState("");
-  const [proofRequestJson, setProofRequestJson] = useState("");
+  // 🔧 這裡改成用 buildProofRequestJson，而不是 DEFAULT_PROOF_REQUEST_JSON
+  const [proofRequestJson, setProofRequestJson] = useState(
+    buildProofRequestJson("", "")
+  );
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [deletingId, setDeletingId] = useState(null);
 
-
-  //  抓取 Proof 紀錄
+  // 抓取 Proof 紀錄
   const fetchProofs = async () => {
     setLoading(true);
     try {
@@ -28,7 +64,7 @@ export default function ProofRequestsPage() {
     }
   };
 
-  //  抓取 Connections
+  // 抓取 Connections
   const fetchConnections = async () => {
     try {
       const res = await fetch("/api/connections");
@@ -44,105 +80,127 @@ export default function ProofRequestsPage() {
     fetchConnections();
   }, []);
 
-  //  發送 Proof Request
+  // 發送 Proof Request
   const sendProofRequest = async () => {
-  try {
-    if (!connectionId) {
-      alert("⚠️ Please select a connection first.");
-      return;
-    }
-
-    // 預設的 proof_request（如果 textarea 空的時候用）
-    const defaultProofRequest = {
-      proof_request: {
-        name: "Simple Test",
-        version: "1.0",
-        requested_attributes: {
-          "attr1_name": {
-            name: "name",
-            // restrictions: [
-            //   {
-            //     cred_def_id:
-            //       credentialDefId ||
-            //       "<Enter a valid Credential Definition ID>",
-            //   },
-            // ],
-          },
-        },
-        requested_predicates: {},
-      },
-    };
-
-    let parsed = null;
-
-    if (proofRequestJson.trim()) {
-      // 使用者有在 textarea 寫東西
-      parsed = JSON.parse(proofRequestJson);
-
-      // 如果他只貼裡面的 proof_request，就包一層
-      if (!parsed.proof_request) {
-        parsed = { proof_request: parsed };
+    try {
+      if (!connectionId) {
+        alert("⚠️ Please select a connection first.");
+        return;
       }
+
+      // 預設 proof_request（如果 textarea 被清空或 parse 失敗時用）
+      const defaultProofRequest = {
+        proof_request: {
+          name: "Proof of Hospital Diagnosis",
+          version: "1.0",
+          requested_attributes: {
+            attr1_name: {
+              name: "name",
+              restrictions: [
+                {
+                  cred_def_id:
+                    credentialDefId ||
+                    "<Enter a valid Credential Definition ID>",
+                },
+              ],
+            },
+          },
+          requested_predicates: {},
+        },
+      };
+
+      let parsed = null;
+
+      if (proofRequestJson.trim()) {
+        try {
+          parsed = JSON.parse(proofRequestJson);
+
+          // 如果使用者只填 proof_request 本體，就幫他包一層
+          if (!parsed.proof_request) {
+            parsed = { proof_request: parsed };
+          }
+        } catch (e) {
+          alert("❌ Proof Request JSON 不是合法 JSON，將改用預設值。\n" + e.message);
+          parsed = null;
+        }
+      }
+
+      const payload = {
+        // 一律用上面選到的 connection
+        connection_id: connectionId,
+        proof_request: (parsed || defaultProofRequest).proof_request,
+      };
+
+      const res = await fetch("/api/proofs/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        alert("✅ Proof request sent successfully!");
+        fetchProofs();
+      } else {
+        alert("❌ Failed: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ " + err.message);
     }
+  };
 
-    // 最終要送給後端的 payload
-    const payload = {
-      // 一律用上方 select 選到的這條 connection
-      connection_id: connectionId,
-      //proof_request 用 textarea（若有）或 default
-      proof_request: (parsed || defaultProofRequest).proof_request,
-    };
+  // 選 connection：更新 connectionId + credentialDefId + textarea JSON
+  const handleConnectionChange = (e) => {
+    const connId = e.target.value;
+    setConnectionId(connId);
 
-    const res = await fetch("/api/proofs/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
+    // 1) 上面的輸入框直接帶入這條 connection 的 ID
+    setCredentialDefId(connId);
 
-    if (data.ok) {
-      alert("✅ Proof request sent successfully!");
-      fetchProofs();
-    } else {
-      alert("❌ Failed: " + data.error);
-    }
-  } catch (err) {
-    console.error(err);
-    alert("❌ " + err.message);
-  }
-};
+    // 2) textarea 的 JSON 也用同一個值當 cred_def_id
+    setProofRequestJson(buildProofRequestJson(connId, connId));
+  };
+
+
+
+  // 2) 改 Credential Definition ID：更新 credentialDefId + JSON（cred_def_id 會跟著變）
+  const handleCredDefChange = (e) => {
+    const newCredDef = e.target.value;
+    setCredentialDefId(newCredDef);
+
+    // 用「目前的 connectionId + 新的 credDef」重組 JSON
+    setProofRequestJson(buildProofRequestJson(connectionId, newCredDef));
+  };
 
   // 刪除一筆 proof record
-const handleDeleteProof = async (id) => {
-  const ok = window.confirm("確定要刪除這筆 proof 紀錄嗎？");
-  if (!ok) return;
+  const handleDeleteProof = async (id) => {
+    const ok = window.confirm("確定要刪除這筆 proof 紀錄嗎？");
+    if (!ok) return;
 
-  try {
-    setDeletingId(id);
-    const res = await fetch(`/api/proofs/${id}`, {
-      method: "DELETE",
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      alert("❌ 刪除失敗：" + data.error);
-    } else {
-      // 刪掉本地 state 裡的這一筆，或重新 fetch
-      setProofs((prev) =>
-        (prev || []).filter(
-          (p) =>
-            (p.presentation_exchange_id || p.pres_ex_id || p._id) !== id
-        )
-      );
+    try {
+      setDeletingId(id);
+      const res = await fetch(`/api/proofs/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert("❌ 刪除失敗：" + data.error);
+      } else {
+        setProofs((prev) =>
+          (prev || []).filter(
+            (p) =>
+              (p.presentation_exchange_id || p.pres_ex_id || p._id) !== id
+          )
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ 刪除時發生錯誤：" + err.message);
+    } finally {
+      setDeletingId(null);
     }
-  } catch (err) {
-    console.error(err);
-    alert("❌ 刪除時發生錯誤：" + err.message);
-  } finally {
-    setDeletingId(null);
-  }
-};
-
-  
+  };
 
   return (
     <div
@@ -154,7 +212,7 @@ const handleDeleteProof = async (id) => {
         minHeight: "70vh",
       }}
     >
-      {/*  頁面標題 */}
+      {/* 頁面標題 */}
       <h2
         style={{
           color: "#003366",
@@ -169,7 +227,7 @@ const handleDeleteProof = async (id) => {
         Proof Requests
       </h2>
 
-      {/*  Tabs */}
+      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -199,7 +257,7 @@ const handleDeleteProof = async (id) => {
         ))}
       </div>
 
-      {/*  Proofs 列表 */}
+      {/* Proofs 列表 */}
       {activeTab === "proofs" && (
         <div>
           {loading ? (
@@ -209,7 +267,8 @@ const handleDeleteProof = async (id) => {
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
               {proofs.map((p) => {
-                const id = p.presentation_exchange_id || p.pres_ex_id || p._id;
+                const id =
+                  p.presentation_exchange_id || p.pres_ex_id || p._id;
 
                 return (
                   <div
@@ -258,7 +317,8 @@ const handleDeleteProof = async (id) => {
                         border: "none",
                         backgroundColor: "#e11d48",
                         color: "white",
-                        cursor: deletingId === id ? "not-allowed" : "pointer",
+                        cursor:
+                          deletingId === id ? "not-allowed" : "pointer",
                         fontWeight: 500,
                         minWidth: "90px",
                       }}
@@ -273,8 +333,7 @@ const handleDeleteProof = async (id) => {
         </div>
       )}
 
-
-      {/*  Request Proof 表單 */}
+      {/* Request Proof 表單 */}
       {activeTab === "request" && (
         <div
           style={{
@@ -284,7 +343,15 @@ const handleDeleteProof = async (id) => {
             boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
           }}
         >
-          <h4 style={{ color: "#003366", marginBottom: "12px" ,marginTop: "5px", fontSize: "20px", fontWeight: 600}}>
+          <h4
+            style={{
+              color: "#003366",
+              marginBottom: "12px",
+              marginTop: "5px",
+              fontSize: "20px",
+              fontWeight: 600,
+            }}
+          >
             Request Proof
           </h4>
 
@@ -294,7 +361,7 @@ const handleDeleteProof = async (id) => {
           </label>
           <select
             value={connectionId}
-            onChange={(e) => setConnectionId(e.target.value)}
+            onChange={handleConnectionChange}
             style={{
               width: "100%",
               padding: "8px",
@@ -313,12 +380,12 @@ const handleDeleteProof = async (id) => {
 
           {/* Credential Definition ID */}
           <label style={{ fontWeight: 500, color: "#003366" }}>
-            Enter a Credential Definition ID:
+            Enter a Credential Definition ID : 
           </label>
           <input
             type="text"
             value={credentialDefId}
-            onChange={(e) => setCredentialDefId(e.target.value)}
+            onChange={handleCredDefChange}
             placeholder="Credential Definition ID"
             style={{
               width: "100%",
@@ -337,22 +404,6 @@ const handleDeleteProof = async (id) => {
             rows={12}
             value={proofRequestJson}
             onChange={(e) => setProofRequestJson(e.target.value)}
-            placeholder={`{
-              "connection_id": "<Enter a valid Connection ID>",
-              "proof_request": {
-                "name": "Proof of Insurance Eligibility",
-                "version": "1.0",
-                "requested_attributes": {
-                  "0_name_uuid": {
-                    "name": "name",
-                    "restrictions": [
-                      { "cred_def_id": "<Enter a valid Credential Definition ID>" }
-                    ]
-                  }
-                },
-                "requested_predicates": {}
-              }
-            }`}
             style={{
               width: "100%",
               padding: "10px",
@@ -363,7 +414,7 @@ const handleDeleteProof = async (id) => {
               marginBottom: "16px",
               backgroundColor: "#f8faff",
             }}
-          />
+          ></textarea>
 
           <button
             onClick={sendProofRequest}
@@ -384,6 +435,10 @@ const handleDeleteProof = async (id) => {
             Request Proof
           </button>
         </div>
+      )}
+
+      {message && (
+        <p style={{ marginTop: "16px", color: "#b91c1c" }}>{message}</p>
       )}
     </div>
   );
