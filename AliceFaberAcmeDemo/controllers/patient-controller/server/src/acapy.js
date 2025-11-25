@@ -301,3 +301,133 @@ export async function acceptRequest(connectionId) {
   );
   return res.data;
 }
+
+// 1. Holder 端列出所有「收到的 Proof Requests」
+export async function getProofs() {
+  try {
+    const res = await axios.get(`${AGENT_BASE}/present-proof/records`, {
+      params: {
+        role: "prover",            // 我是證明者 (holder)
+        state: "request_received", // 剛收到 request 還沒回應
+      },
+    });
+
+    return res.data.results || [];
+  } catch (e) {
+    console.error(
+      "getProofs error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    throw e;
+  }
+}
+
+// 自動替這個 proof_ex_id 找錢包裡可用的 credential，然後送 presentation
+// 自動替這個 proof_ex_id 找錢包裡可用的 credential，然後送 presentation
+export async function sendProofPresentation(proofExId) {
+  try {
+    // 1) 先拿這筆 proof exchange record，看它要哪些屬性
+    const recRes = await axios.get(
+      `${AGENT_BASE}/present-proof/records/${proofExId}`
+    );
+    const rec = recRes.data;
+
+    // 取出 proof_request 本體
+    const proofReq =
+      rec.presentation_request?.proof_request ||
+      rec.presentation_request ||
+      rec.proof_request ||
+      null;
+
+    if (!proofReq || !proofReq.requested_attributes) {
+      throw new Error("No requested_attributes found in proof request.");
+    }
+
+    // 這些 key 就是 referents，例如 "attr1_name"
+    const attrReferents = Object.keys(proofReq.requested_attributes);
+
+    // 2) 一次把所有 candidate credentials 拿出來
+    const credsRes = await axios.get(
+      `${AGENT_BASE}/present-proof/records/${proofExId}/credentials`
+    );
+    const allCreds = credsRes.data || [];
+
+    if (!allCreds.length) {
+      throw new Error("No matching credentials found in wallet for this proof request.");
+    }
+
+    const requestedAttributesBody = {};
+
+    // 3) 對每一個 referent，找一張能用的 credential
+    for (const referent of attrReferents) {
+      const match = allCreds.find((c) =>
+        (c.presentation_referents || []).includes(referent)
+      );
+
+      if (!match) {
+        throw new Error(
+          `No matching credential found in wallet for referent: ${referent}`
+        );
+      }
+
+      const credInfo = match.cred_info || match;
+      const credId = credInfo.referent;
+
+      requestedAttributesBody[referent] = {
+        cred_id: credId,
+        revealed: true,
+      };
+    }
+
+    // 4) 組出 send-presentation 需要的 payload
+    const body = {
+      self_attested_attributes: {},
+      requested_attributes: requestedAttributesBody,
+      requested_predicates: {},
+    };
+
+    const res = await axios.post(
+      `${AGENT_BASE}/present-proof/records/${proofExId}/send-presentation`,
+      body,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    return res.data;
+  } catch (e) {
+    console.error(
+      "[PS] sendProofPresentation error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+
+    const detail =
+      typeof e.response?.data === "string"
+        ? e.response.data
+        : JSON.stringify(e.response?.data || { error: e.message });
+
+    throw new Error(detail);
+  }
+}
+
+
+// 3. 按下 Decline 時，回一個 problem-report
+export async function declineProofRequest(proofExId, description = "User declined proof request") {
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/present-proof/records/${proofExId}/problem-report`,
+      { description }
+    );
+    return res.data;
+  } catch (e) {
+    console.error(
+      "declineProofRequest error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    throw e;
+  }
+}
+

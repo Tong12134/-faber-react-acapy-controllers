@@ -151,6 +151,55 @@ export async function acceptRequest(connectionId) {
   return res.data;
 }
 
+// 取得 present-proof v2 記錄列表
+// Insurer 端：列出所有 verifier 角色的 proof records
+export async function getProofs() {
+  try {
+    const res = await axios.get(`${AGENT_BASE}/present-proof/records`, {
+      params: {
+        role: "verifier",  
+        // 先不要過濾 state，全部拿回來，前端再決定怎麼顯示
+        // 例如要只看已驗證的，可以再加 state: "verified"
+      },
+    });
+
+    return res.data.results || [];
+  } catch (e) {
+    console.error(
+      "[IS] getProofs error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    throw e;
+  }
+}
+
+// 發送 proof request（present-proof v1）
+export async function sendProofRequest(proofRequestJson) {
+  try {
+    const res = await axios.post(
+      `${AGENT_BASE}/present-proof/send-request`,
+      proofRequestJson,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /present-proof/send-request error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
+}
 
 
 /** Remove connection */
@@ -167,4 +216,22 @@ export async function removeConnection(id) {
     throw new Error(err.response?.data?.error || err.message);
   }
 }
+
+// 刪除一筆 present-proof record（只刪 controller 這邊的紀錄）
+export async function deleteProofRecord(proofExId) {
+  try {
+    const res = await axios.delete(
+      `${AGENT_BASE}/present-proof/records/${proofExId}`
+    );
+    return res.data;
+  } catch (e) {
+    console.error(
+      "[IS] deleteProofRecord error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    throw e;
+  }
+}
+
 

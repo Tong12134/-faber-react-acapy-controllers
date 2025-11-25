@@ -35,4 +35,16 @@ router.post("/request", async (req, res) => {
   }
 });
 
+// 刪除一筆 proof record
+router.delete("/:id", async (req, res) => {
+  try {
+    await acapy.deleteProofRecord(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[IS] [DELETE proof] error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 export default router;

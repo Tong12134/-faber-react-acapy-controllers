@@ -9,6 +9,8 @@ export default function ProofRequestsPage() {
   const [proofRequestJson, setProofRequestJson] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
+
 
   //  抓取 Proof 紀錄
   const fetchProofs = async () => {
@@ -44,55 +46,103 @@ export default function ProofRequestsPage() {
 
   //  發送 Proof Request
   const sendProofRequest = async () => {
-    try {
-      if (!connectionId) {
-        alert("⚠️ Please select a connection first.");
-        return;
-      }
-
-      const defaultProofRequest = {
-        connection_id: connectionId,
-        proof_request: {
-          name: "Proof of Insurance Eligibility",
-          version: "1.0",
-          requested_attributes: {
-            "0_name_uuid": {
-              name: "name",
-              restrictions: [
-                {
-                  cred_def_id:
-                    credentialDefId ||
-                    "<Enter a valid Credential Definition ID>",
-                },
-              ],
-            },
-          },
-          requested_predicates: {},
-        },
-      };
-
-      const payload = proofRequestJson
-        ? JSON.parse(proofRequestJson)
-        : defaultProofRequest;
-
-      const res = await fetch("/api/proofs/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (data.ok) {
-        alert("✅ Proof request sent successfully!");
-        fetchProofs();
-      } else {
-        alert("❌ Failed: " + data.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("❌ " + err.message);
+  try {
+    if (!connectionId) {
+      alert("⚠️ Please select a connection first.");
+      return;
     }
-  };
+
+    // 預設的 proof_request（如果 textarea 空的時候用）
+    const defaultProofRequest = {
+      proof_request: {
+        name: "Simple Test",
+        version: "1.0",
+        requested_attributes: {
+          "attr1_name": {
+            name: "name",
+            // restrictions: [
+            //   {
+            //     cred_def_id:
+            //       credentialDefId ||
+            //       "<Enter a valid Credential Definition ID>",
+            //   },
+            // ],
+          },
+        },
+        requested_predicates: {},
+      },
+    };
+
+    let parsed = null;
+
+    if (proofRequestJson.trim()) {
+      // 使用者有在 textarea 寫東西
+      parsed = JSON.parse(proofRequestJson);
+
+      // 如果他只貼裡面的 proof_request，就包一層
+      if (!parsed.proof_request) {
+        parsed = { proof_request: parsed };
+      }
+    }
+
+    // 最終要送給後端的 payload
+    const payload = {
+      // 一律用上方 select 選到的這條 connection
+      connection_id: connectionId,
+      //proof_request 用 textarea（若有）或 default
+      proof_request: (parsed || defaultProofRequest).proof_request,
+    };
+
+    const res = await fetch("/api/proofs/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      alert("✅ Proof request sent successfully!");
+      fetchProofs();
+    } else {
+      alert("❌ Failed: " + data.error);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("❌ " + err.message);
+  }
+};
+
+  // 刪除一筆 proof record
+const handleDeleteProof = async (id) => {
+  const ok = window.confirm("確定要刪除這筆 proof 紀錄嗎？");
+  if (!ok) return;
+
+  try {
+    setDeletingId(id);
+    const res = await fetch(`/api/proofs/${id}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      alert("❌ 刪除失敗：" + data.error);
+    } else {
+      // 刪掉本地 state 裡的這一筆，或重新 fetch
+      setProofs((prev) =>
+        (prev || []).filter(
+          (p) =>
+            (p.presentation_exchange_id || p.pres_ex_id || p._id) !== id
+        )
+      );
+    }
+  } catch (err) {
+    console.error(err);
+    alert("❌ 刪除時發生錯誤：" + err.message);
+  } finally {
+    setDeletingId(null);
+  }
+};
+
+  
 
   return (
     <div
@@ -158,44 +208,71 @@ export default function ProofRequestsPage() {
             <p>No proofs available.</p>
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
-              {proofs.map((p) => (
-                <div
-                  key={p.presentation_exchange_id}
-                  style={{
-                    backgroundColor: "white",
-                    borderRadius: "8px",
-                    padding: "16px",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  <p>
-                    <strong>ID:</strong> {p.presentation_exchange_id}
-                  </p>
-                  <p>
-                    <strong>State:</strong>{" "}
-                    <span
+              {proofs.map((p) => {
+                const id = p.presentation_exchange_id || p.pres_ex_id || p._id;
+
+                return (
+                  <div
+                    key={id}
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: "8px",
+                      padding: "16px",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <p>
+                        <strong>ID:</strong> {id}
+                      </p>
+                      <p>
+                        <strong>State:</strong>{" "}
+                        <span
+                          style={{
+                            color:
+                              p.state === "verified"
+                                ? "green"
+                                : p.state === "request-sent"
+                                ? "#3366cc"
+                                : "#666",
+                          }}
+                        >
+                          {p.state}
+                        </span>
+                      </p>
+                      <p>
+                        <strong>Connection:</strong> {p.connection_id || "N/A"}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteProof(id)}
+                      disabled={deletingId === id}
                       style={{
-                        color:
-                          p.state === "verified"
-                            ? "green"
-                            : p.state === "request-sent"
-                            ? "#3366cc"
-                            : "#666",
+                        padding: "8px 14px",
+                        borderRadius: "6px",
+                        border: "none",
+                        backgroundColor: "#e11d48",
+                        color: "white",
+                        cursor: deletingId === id ? "not-allowed" : "pointer",
+                        fontWeight: 500,
+                        minWidth: "90px",
                       }}
                     >
-                      {p.state}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Connection:</strong> {p.connection_id || "N/A"}
-                  </p>
-                </div>
-              ))}
+                      {deletingId === id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       )}
+
 
       {/*  Request Proof 表單 */}
       {activeTab === "request" && (
