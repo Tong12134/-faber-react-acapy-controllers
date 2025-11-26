@@ -32,7 +32,6 @@ app.get("/api/agent/status", async (req, res) => {
   }
 });
 
-
 app.use("/api/connections", connections);
 app.use("/api/credentialSchemas", credentialSchemas);
 app.use("/api/credentialDefinitions", credentialDefinitions);

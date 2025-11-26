@@ -2,6 +2,9 @@ import React, { useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import AgentStatus from "./components/AgentStatus.jsx";
 import Connections from "./pages/Connections.jsx";
+import CredentialSchemas from "./pages/CredentialSchemas.jsx";
+import CredentialDefinitions from "./pages/CredentialDefinitions.jsx";
+import Credentials from "./pages/Credentials.jsx";
 import ProofRequests from "./pages/ProofRequests.jsx";
 
 export default function App() {
@@ -28,7 +31,7 @@ export default function App() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "26px 20px",
+          padding: "60px 30px",
           backgroundColor: "#1e3a5f",
           color: "white",
           borderRadius: "8px",
@@ -50,13 +53,13 @@ export default function App() {
             <h1
               style={{
                 margin: 0,
-                fontSize: "28px",
+                fontSize: "38px",
                 fontWeight: "600",
                 letterSpacing: "0.5px",
                 cursor: "pointer",
               }}
             >
-               📑 Insurer Controller
+               📑 Insurer 
             </h1>
           </Link>
         </div>
@@ -72,13 +75,16 @@ export default function App() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "40px",
+            gap: "18px",
             margin: "20px 24px",
             marginBottom: "0px",
           }}
         >
           {[
             { to: "/connections", label: "Connections" },
+            { to: "/credentialSchemas", label: "Credential Schemas" },
+            { to: "/credentialDefinitions", label: "Credential Definitions" },
+            { to: "/credentials", label: "Credentials" },
             { to: "/proofRequests", label: "Proof Requests" },
           ].map(({ to, label }) => (
             <Link
@@ -96,7 +102,7 @@ export default function App() {
                 fontWeight: 500,
                 boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                 transition: "all 0.2s ease",
-                fontSize: "18px",
+                fontSize: "23px",
               }}
               onMouseOver={(e) => {
                 e.target.style.backgroundColor = "#d0e0ff";
@@ -128,6 +134,9 @@ export default function App() {
           {[
             { to: "/", label: "Home" },
             { to: "/connections", label: "Connections" },
+            { to: "/credentialSchemas", label: "Credential Schemas" },
+            { to: "/credentialDefinitions", label: "Credential Definitions" },
+            { to: "/credentials", label: "Credentials" },
             { to: "/proofRequests", label: "Proof Requests" },
           ].map(({ to, label }) => {
             const isActive = location.pathname === to;
@@ -166,11 +175,14 @@ export default function App() {
                   color: "#333",
                 }}
               >
-                Welcome to Insurer Controller.
+                Welcome to Insurer Agent.
               </p>
             }
           />
           <Route path="/connections" element={<Connections />} />
+          <Route path="/credentialSchemas" element={<CredentialSchemas />} />
+          <Route path="/credentialDefinitions" element={<CredentialDefinitions />}/>
+          <Route path="/credentials" element={<Credentials />} />
           <Route path="/proofRequests" element={<ProofRequests />} />
           <Route path="*" element={<p>404 - Page Not Found</p>} />
         </Routes>

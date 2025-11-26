@@ -74,7 +74,7 @@ export default function CredentialDefinitionsPage() {
         }}
       > Credential Definitions</h2>
 
-      {/*  下拉選單區塊 */}
+      {/* 下拉選單區塊 */}
       <div
         style={{
           backgroundColor: "white",

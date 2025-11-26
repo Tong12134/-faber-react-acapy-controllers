@@ -1,4 +1,4 @@
-// server/src/routes.credentialschemas.js
+// server/src/routes.schemas.js
 import express from "express";
 import * as acapy from "./acapy.js";
 

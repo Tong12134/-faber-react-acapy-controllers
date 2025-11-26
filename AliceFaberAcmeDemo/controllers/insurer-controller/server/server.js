@@ -7,6 +7,9 @@ import { fileURLToPath } from "url";
 
 import connections from "./src/routes.connections.js";
 import proofs from "./src/routes.proofs.js";
+import credentialSchemas from "./src/routes.credentialSchemas.js";
+import credentialDefinitions from "./src/routes.credentialDefinitions.js";
+import credentials from "./src/routes.credentials.js";
 import webhooks from "./src/webhooks.js";
 import * as acapy from "./src/acapy.js";
 
@@ -34,9 +37,22 @@ app.get("/api/agent/status", async (req, res) => {
 // API routes
 app.use("/api/connections", connections);
 app.use("/api/proofs", proofs);
+app.use("/api/credentialSchemas", credentialSchemas);
+app.use("/api/credentialDefinitions", credentialDefinitions);
+app.use("/api/credentials", credentials);
 
 // Webhooks（需在 ACA-Py 啟動時指定）
 app.post("/webhooks/topic/:topic", webhooks);
 
 const PORT = process.env.PORT || 5070; 
-app.listen(PORT, () => console.log(`[patient-controller] listening on :${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`[insurer-controller] listening on :${PORT}`);
+
+  try {
+    const { schemaId, credDefId } = await ensureInsurerSchemaAndCredDef();
+    console.log("[insurer-controller] Ready with schema:", schemaId);
+    console.log("[insurer-controller] Ready with cred def:", credDefId);
+  } catch (e) {
+    console.error("[insurer-controller] schema init error:", e.message);
+  }
+});

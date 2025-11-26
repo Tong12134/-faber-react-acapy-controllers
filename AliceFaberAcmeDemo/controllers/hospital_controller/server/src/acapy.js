@@ -22,10 +22,10 @@ export async function ping() {
 
 /** 確保 Hospital 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureHospitalSchemaAndCredDef() {
-  const SCHEMA_NAME = "HospitalDiagnosisV2";
+  const SCHEMA_NAME = " Educational qualifications  ";
   const SCHEMA_VERSION = "2.0.0";
   const ATTRIBUTES = ["name", "date", "degree", "birthdate_dateint", "timestamp"];
-  const TAG = "hospital-03"; 
+  const TAG = "Educational-01"; 
 
   // 1) 先找 schema
   const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
@@ -157,45 +157,7 @@ export async function getConnection(connectionId) {
   return res.data;
 }
 
-/**
- * 建立 Invitation（給前端用來產 QRCode）
- */
-export async function createInvitation(options = {}) {
-  try {
-    const body = {
-      auto_accept: true,
-      // 使用 DIDExchange 1.1 handshakes
-      handshake_protocols: ["https://didcomm.org/didexchange/1.1"],
-      // 如果之後要支援多用 / 附加 attachment，可以從 options 傳進來
-      ...options,
-    };
-
-    const res = await axios.post(
-      `${AGENT_BASE}/out-of-band/create-invitation`,
-      body,
-      {
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-
-    // 回傳格式通常是：
-    // {
-    //   "invitation": { ... },
-    //   "invitation_url": "https://..."
-    //   "trace": false,
-    //   "out_of_band_id": "..."
-    // }
-    return res.data;
-  } catch (err) {
-    console.error(
-      "ACA-Py /out-of-band/create-invitation error:",
-      err.response?.status,
-      err.response?.data || err.message
-    );
-    throw new Error(err.response?.data?.error || err.message);
-  }
-}
-
+/** 建立 Static Connection（給後端系統對系統用） */
 export async function createStaticConnection({
   theirSeed,
   theirDid,
@@ -231,6 +193,44 @@ export async function createStaticConnection({
   }
 }
 
+/**
+ * 建立 Invitation（給前端用來產 QRCode）
+ */
+export async function createInvitation(options = {}) {
+  try {
+    const body = {
+      auto_accept: true,
+      // 使用 DIDExchange 1.1 handshakes
+      handshake_protocols: ["https://didcomm.org/didexchange/1.1"],
+      // 如果之後要支援多用 / 附加 attachment，可以從 options 傳進來
+      ...options,
+    };
+
+    const res = await axios.post(
+      `${AGENT_BASE}/out-of-band/create-invitation`,
+      body,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    // 回傳格式通常是：
+    // {
+    //   "invitation": { ... },
+    //   "invitation_url": "https://..."
+    //   "trace": false,
+    //   "out_of_band_id": "..."
+    // }
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /out-of-band/create-invitation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(err.response?.data?.error || err.message);
+  }
+}
+
 /** Receive invitation（另一端收到 invitation 時使用） */
 export async function receiveInvitation(invite) {
   try {
@@ -251,7 +251,6 @@ export async function receiveInvitation(invite) {
     throw new Error(err.response?.data?.error || err.message);
   }
 }
-
 
 /** 接受特定邀請 */
 export async function acceptInvitation(connectionId) {
