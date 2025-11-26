@@ -152,15 +152,13 @@ export default function ProofRequestsPage() {
 
   // 選 connection：更新 connectionId + credentialDefId + textarea JSON
   const handleConnectionChange = (e) => {
-    const connId = e.target.value;
-    setConnectionId(connId);
+  const connId = e.target.value;
+  setConnectionId(connId);
 
-    // 1) 上面的輸入框直接帶入這條 connection 的 ID
-    setCredentialDefId(connId);
+  // 依照「新的 connectionId + 目前輸入的 credentialDefId」重新組 JSON
+  setProofRequestJson((old) => buildProofRequestJson(connId, credentialDefId));
+};
 
-    // 2) textarea 的 JSON 也用同一個值當 cred_def_id
-    setProofRequestJson(buildProofRequestJson(connId, connId));
-  };
 
 
 
