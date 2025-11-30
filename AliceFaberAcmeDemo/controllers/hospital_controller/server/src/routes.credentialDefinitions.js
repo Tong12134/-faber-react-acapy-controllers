@@ -12,7 +12,7 @@ router.get("/", async (req, res) => {
   try {
     const ids = await acapy.getCredentialDefinitions();
     console.log(" ACA-Py returned IDs:", ids);
-    res.json({ ok: true, defIds: ids });
+    res.json({ ok: true, credentialDefinitionIds: ids });
   } catch (err) {
     console.error("get definitions error:", err.message);
     res.status(500).json({ ok: false, error: err.message });

@@ -7,6 +7,7 @@ export default function CredentialsPage() {
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [acceptingId, setAcceptingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);   
 
   // DID → 顯示名稱
   const DID_LABELS = {
@@ -49,6 +50,40 @@ export default function CredentialsPage() {
       setLoadingOffers(false);
     }
   };
+
+  const handleDeleteCredential = async (credId) => {
+  if (!credId) return;
+
+  const ok = window.confirm("確定要刪除這張 Credential 嗎？");
+  if (!ok) return;
+
+  setDeletingId(credId);
+  try {
+    const res = await fetch(`/api/credentials/${credId}/remove`, {
+      method: "POST",
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      alert("❌ 刪除失敗：" + data.error);
+      return;
+    }
+
+    // 從前端 state 中移除這張
+    setCredentials((prev) => (prev || []).filter((c) => c.id !== credId));
+
+    // 如果剛好有打開詳細欄位，順便收起來
+    if (expandedId === credId) {
+      setExpandedId(null);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("❌ 刪除時發生錯誤：" + err.message);
+  } finally {
+    setDeletingId(null);
+  }
+};
+
 
   // 按「Accept」
   // 後端會呼叫 /issue-credential/records/{id}/send-request (auto_store_credential)
@@ -273,24 +308,52 @@ export default function CredentialsPage() {
                   {cred.issuerLabel && <span style={smallBadge}>verified</span>}
                 </p>
 
-                <button
-                  onClick={() =>
-                    setExpandedId(expandedId === cred.id ? null : cred.id)
-                  }
+                <div
                   style={{
-                    marginTop: "4px",
-                    padding: "6px 12px",
-                    borderRadius: "999px",
-                    border: "1px solid #cbd5f5",
-                    backgroundColor: "#f8fafc",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
+                  display: "flex",
+                  alignItems: "center",
+                  marginTop: "8px",
+                }}
                 >
-                  {expandedId === cred.id
-                    ? "Hide attributes"
-                    : "Show attributes"}
-                </button>
+                  {/* 左邊：Show / Hide attributes */}
+                  <button
+                    onClick={() =>
+                      setExpandedId(expandedId === cred.id ? null : cred.id)
+                    }
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "999px",
+                      border: "1px solid #cbd5f5",
+                      backgroundColor: "#f8fafc",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {expandedId === cred.id ? "Hide attributes" : "Show attributes"}
+                  </button>
+
+                  {/* 中間塞一個彈性的空白，把右邊的 Delete 擠到最右 */}
+                  <div style={{ flex: 1 }} />
+
+                  {/* 右邊：Delete */}
+                  <button
+                    onClick={() => handleDeleteCredential(cred.id)}
+                    disabled={deletingId === cred.id}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "999px",
+                      border: "none",
+                      backgroundColor: "#e11d48",
+                      color: "white",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: deletingId === cred.id ? "not-allowed" : "pointer",
+                      opacity: deletingId === cred.id ? 0.7 : 1,
+                    }}
+                  >
+                    {deletingId === cred.id ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
 
                 {expandedId === cred.id && cred.attrs && (
                   <div

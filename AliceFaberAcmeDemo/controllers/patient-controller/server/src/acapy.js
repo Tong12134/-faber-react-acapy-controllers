@@ -190,6 +190,25 @@ export async function getCredentials() {
   return res.data.results || [];
 }
 
+/** 刪除一張已存進 wallet 的 credential */
+export async function removeCredential(credId) {
+  try {
+    const res = await axios.delete(`${AGENT_BASE}/credentials/${credId}`);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "ACA-Py /credentials/{id} DELETE error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    throw new Error(
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message })
+    );
+  }
+}
+
 /** Remove connection */
 export async function removeConnection(id) {
   try {

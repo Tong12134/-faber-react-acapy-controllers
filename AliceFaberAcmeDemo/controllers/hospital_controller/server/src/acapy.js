@@ -22,10 +22,34 @@ export async function ping() {
 
 /** 確保 Hospital 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureHospitalSchemaAndCredDef() {
-  const SCHEMA_NAME = " Educational qualifications  ";
-  const SCHEMA_VERSION = "2.0.0";
-  const ATTRIBUTES = ["name", "date", "degree", "birthdate_dateint", "timestamp"];
-  const TAG = "Educational-01"; 
+  const SCHEMA_NAME = "HospitalEncounterSummaryV1";
+  const SCHEMA_VERSION = "1.0.1";
+  
+  const ATTRIBUTES = [
+    "patient_id", 
+    "patient_name", 
+    "patient_birthdate_dateint", 
+    "encounter_id",
+    "encounter_date",
+    "encounter_class",
+    "encounter_department",
+    "diagnosis_system",
+    "diagnosis_code",
+    "diagnosis_display",
+    "admission_date", //住院開始日期
+    "discharge_date", //住院結束日期
+    // "length_of_stay_days",
+    "procedure_code",
+    "procedure_display",
+    "provider_org_name",
+    "provider_org_id",
+    "fhir_bundle_id",
+    "fhir_bundle_hash",
+    "record_type",
+    "timestamp",
+  ];
+  const TAG = "hospital-encounter-v1"; 
+  
 
   // 1) 先找 schema
   const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
@@ -91,8 +115,6 @@ export async function ensureHospitalSchemaAndCredDef() {
     throw new Error(detail);
   }
 }
-
-
 
 /** 取得所有 Schemas */
 export async function getSchemas() {

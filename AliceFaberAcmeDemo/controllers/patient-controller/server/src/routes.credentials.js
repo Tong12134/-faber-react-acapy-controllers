@@ -67,5 +67,15 @@ router.get("/", async (req, res) => {
   }
 });
 
+/** 刪除一張 credential */
+router.post("/:id/remove", async (req, res) => {
+  try {
+    await acapy.removeCredential(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("remove-credential error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 export default router;
