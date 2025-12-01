@@ -12,6 +12,8 @@ import credentialDefinitions from "./src/routes.credentialDefinitions.js";
 import credentials from "./src/routes.credentials.js";
 import webhooks from "./src/webhooks.js";
 import * as acapy from "./src/acapy.js";
+import { ensureInsurerSchemaAndCredDef } from "./src/acapy.js";
+import claimpreview from "./src/routes.claimPreview.js";
 
 console.log("[SERVER] I am", process.env.SERVICE_NAME || "unknown");
 console.log("[SERVER] AGENT_URL =", process.env.AGENT_URL);
@@ -40,6 +42,7 @@ app.use("/api/proofs", proofs);
 app.use("/api/credentialSchemas", credentialSchemas);
 app.use("/api/credentialDefinitions", credentialDefinitions);
 app.use("/api/credentials", credentials);
+app.use("/api/claim", claimpreview);
 
 // Webhooks（需在 ACA-Py 啟動時指定）
 app.post("/webhooks/topic/:topic", webhooks);

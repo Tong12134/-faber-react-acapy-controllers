@@ -102,7 +102,7 @@ export default function App() {
                 fontWeight: 500,
                 boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                 transition: "all 0.2s ease",
-                fontSize: "23px",
+                fontSize: "20px",
               }}
               onMouseOver={(e) => {
                 e.target.style.backgroundColor = "#d0e0ff";

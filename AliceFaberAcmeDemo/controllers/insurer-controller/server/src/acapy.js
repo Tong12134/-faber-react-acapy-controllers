@@ -20,8 +20,8 @@ export async function ping() {
 
 /** 確保 insurer 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureInsurerSchemaAndCredDef() {
-  const SCHEMA_NAME = " insurance policy  ";
-  const SCHEMA_VERSION = "2.0.0";
+  const SCHEMA_NAME = "insurance_policy";
+  const SCHEMA_VERSION = "2.0.1";
   const ATTRIBUTES = ["name", "date", "degree", "birthdate_dateint", "timestamp"];
   const TAG = "insurance-01"; 
 

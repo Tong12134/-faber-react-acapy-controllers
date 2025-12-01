@@ -8,12 +8,43 @@ export default function CredentialsPage() {
   const [acceptingId, setAcceptingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);   
+  const [previewingId, setPreviewingId] = useState(null);      // 哪一張 credential 正在試算
+  const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({}); // { [credId]: previewResult }
+
 
   // DID → 顯示名稱
   const DID_LABELS = {
     QWTxizRo9A1tWdEPYkFPHe: "Hospital",
     // SOMEOTHERDID: "Insurer",
   };
+
+//
+const mockCredentialAttrs = {
+  hospital_id: "HOSPITAL-001",
+  encounter_id: "E2025-0001",
+  encounter_class: "INPATIENT",
+  encounter_department: "Orthopedics",
+  encounter_date: "2025-06-01",
+  admission_date: "2025-06-01",
+  discharge_date: "2025-06-05",
+  diagnosis_system: "ICD-10",
+  diagnosis_code: "S7200",
+  diagnosis_display: "Femur fracture",
+  procedure_code: "FEMUR-ORIF",
+  procedure_display: "Open reduction internal fixation",
+  provider_org_name: "Good Hospital",
+  provider_org_id: "HOSPITAL-001",
+  record_type: "encounter",
+  timestamp: "2025-06-06T10:00:00+08:00",
+};
+
+
+
+//
+
+
+
+
 
   // 取得已儲存的 credentials
   const fetchCredentials = async () => {
@@ -83,6 +114,55 @@ export default function CredentialsPage() {
     setDeletingId(null);
   }
 };
+
+//
+  const handlePreviewClaim = async (cred) => {
+    // cred 是整張 Credential，會有 id 跟 attrs
+    const credId = cred.id;
+    if (!credId) return;
+
+    setPreviewingId(credId);
+
+    // attrs：優先用真正憑證裡的 attrs，沒有的時候就 fallback 到 mock
+    const attrs =
+      cred.attrs && Object.keys(cred.attrs).length > 0
+        ? cred.attrs
+        : mockCredentialAttrs;
+
+    try {
+      const res = await fetch(
+        // 這裡的 URL 請換成你 insurer backend 的真正位置
+        "http://localhost:3000/api/claim/preview-from-hospital-credential",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            credentialAttrs: attrs,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!data.ok) {
+        alert("❌ 試算失敗：" + (data.error || "unknown error"));
+        return;
+      }
+
+      setClaimPreviewByCredId((prev) => ({
+        ...prev,
+        [credId]: data.preview, // { eligible, totalPayout, breakdown: [] }
+      }));
+    } catch (err) {
+      console.error(err);
+      alert("❌ 呼叫理賠試算 API 失敗：" + err.message);
+    } finally {
+      setPreviewingId(null);
+    }
+  };
+
+
+
+//
 
 
   // 按「Accept」
@@ -332,8 +412,29 @@ export default function CredentialsPage() {
                     {expandedId === cred.id ? "Hide attributes" : "Show attributes"}
                   </button>
 
+                  {/* 中間：試算理賠 */}
+                  <button
+                    onClick={() => handlePreviewClaim(cred)}
+                    disabled={previewingId === cred.id}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "999px",
+                      border: "1px solid #bbf7d0",
+                      backgroundColor:
+                        previewingId === cred.id ? "#dcfce7" : "#22c55e",
+                      color: "#064e3b",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: previewingId === cred.id ? "wait" : "pointer",
+                    }}
+                  >
+                    {previewingId === cred.id ? "計算中..." : "試算理賠"}
+                  </button>
+
+
                   {/* 中間塞一個彈性的空白，把右邊的 Delete 擠到最右 */}
                   <div style={{ flex: 1 }} />
+
 
                   {/* 右邊：Delete */}
                   <button
@@ -424,6 +525,54 @@ export default function CredentialsPage() {
                     </dl>
                   </div>
                 )}
+
+                                {/* 預估理賠結果 */}
+                {claimPreviewByCredId[cred.id] && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      borderRadius: "12px",
+                      background: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      padding: "14px 16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        marginBottom: "8px",
+                        color: "#166534",
+                      }}
+                    >
+                      預估理賠結果
+                    </div>
+                    <p style={{ margin: 0, fontSize: "13px", color: "#14532d" }}>
+                      可否理賠：
+                      {claimPreviewByCredId[cred.id].eligible ? "可以" : "不可以"}
+                    </p>
+                    <p style={{ margin: "4px 0 8px", fontSize: "13px", color: "#14532d" }}>
+                      預估金額：{claimPreviewByCredId[cred.id].totalPayout} 元
+                    </p>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: "18px",
+                        fontSize: "12px",
+                        color: "#166534",
+                      }}
+                    >
+                      {claimPreviewByCredId[cred.id].breakdown.map((r, idx) => (
+                        <li key={idx}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+
+
+
+
               </div>
             ))}
           </div>

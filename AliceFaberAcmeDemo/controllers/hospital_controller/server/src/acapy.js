@@ -100,11 +100,12 @@ export async function ensureHospitalSchemaAndCredDef() {
 
     return { schemaId, credDefId };
   } catch (err) {
-    console.error(
-      "[HS] [INIT] cred def error:",
-      err.response?.status,
-      err.response?.data || err.message
-    );
+    //  印出完整的 response data
+    console.error("================ ERROR DEBUG ================");
+    console.error("[HS] Status:", err.response?.status);
+    console.error("[HS] Data:", JSON.stringify(err.response?.data, null, 2));
+    console.error("[HS] Message:", err.message);
+    console.error("=============================================");
 
     // 把 ACA-Py 回傳內容包進錯誤字串往外丟，server 那邊就看得到細節
     const detail =
