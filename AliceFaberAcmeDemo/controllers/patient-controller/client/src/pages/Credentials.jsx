@@ -10,6 +10,8 @@ export default function CredentialsPage() {
   const [deletingId, setDeletingId] = useState(null);   
   const [previewingId, setPreviewingId] = useState(null);      // 哪一張 credential 正在試算
   const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({}); // { [credId]: previewResult }
+  const [submittingId, setSubmittingId] = useState(null);
+  const [submittedClaimByCredId, setSubmittedClaimByCredId] = useState({});
 
 
   // DID → 顯示名稱
@@ -18,25 +20,32 @@ export default function CredentialsPage() {
     // SOMEOTHERDID: "Insurer",
   };
 
+  const INSURER_API_BASE = "http://localhost:5070";
+
+  // 假資料，或之後從登入狀態拿
+  const DEMO_INSURED_ID = "patient-001";
+  const DEMO_POLICY_ID = "POLICY-DEMO-001";
+
+
 //
-const mockCredentialAttrs = {
-  hospital_id: "HOSPITAL-001",
-  encounter_id: "E2025-0001",
-  encounter_class: "INPATIENT",
-  encounter_department: "Orthopedics",
-  encounter_date: "2025-06-01",
-  admission_date: "2025-06-01",
-  discharge_date: "2025-06-05",
-  diagnosis_system: "ICD-10",
-  diagnosis_code: "S7200",
-  diagnosis_display: "Femur fracture",
-  procedure_code: "FEMUR-ORIF",
-  procedure_display: "Open reduction internal fixation",
-  provider_org_name: "Good Hospital",
-  provider_org_id: "HOSPITAL-001",
-  record_type: "encounter",
-  timestamp: "2025-06-06T10:00:00+08:00",
-};
+  const mockCredentialAttrs = {
+    hospital_id: "HOSPITAL-001",
+    encounter_id: "E2025-0001",
+    encounter_class: "INPATIENT",
+    encounter_department: "Orthopedics",
+    encounter_date: "2025-06-01",
+    admission_date: "2025-06-01",
+    discharge_date: "2025-06-05",
+    diagnosis_system: "ICD-10",
+    diagnosis_code: "S7200",
+    diagnosis_display: "Femur fracture",
+    procedure_code: "FEMUR-ORIF",
+    procedure_display: "Open reduction internal fixation",
+    provider_org_name: "Good Hospital",
+    provider_org_id: "HOSPITAL-001",
+    record_type: "encounter",
+    timestamp: "2025-06-06T10:00:00+08:00",
+  };
 
 
 
@@ -159,6 +168,71 @@ const mockCredentialAttrs = {
       setPreviewingId(null);
     }
   };
+
+
+// 先到的在上面：假設後端回來是「最新在最前面」，這裡直接反轉
+const sortedCredentials = [...(credentials || [])].reverse();
+
+//   // 依時間排序：先到的在上面
+//   const sortedCredentials = [...(credentials || [])].sort((a, b) => {
+//   // 嘗試從 attrs.timestamp / createdAt / updatedAt 取時間
+//   const getTime = (cred) => {
+//     const t =
+//       cred.attrs?.timestamp ||
+//       cred.attrs?.issueDate ||
+//       cred.createdAt ||
+//       cred.updatedAt;
+
+//     const d = t ? new Date(t) : null;
+//     return d && !isNaN(d.getTime()) ? d.getTime() : 0;
+//   };
+
+//   return getTime(a) - getTime(b); // 時間小的（較早）排前面
+// });
+
+
+
+  const handleSubmitClaim = async (cred) => {
+  const credId = cred.id;
+  if (!credId) return;
+
+  setSubmittingId(credId);
+
+  // attrs：一樣優先用真的 cred.attrs，沒有就用 mock
+  const attrs =
+    cred.attrs && Object.keys(cred.attrs).length > 0
+      ? cred.attrs
+      : mockCredentialAttrs;
+
+  try {
+    const res = await fetch(`${INSURER_API_BASE}/api/claim/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        credentialAttrs: attrs,
+        insuredId: DEMO_INSURED_ID,
+        policyId: DEMO_POLICY_ID,
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      alert("❌ 送出理賠申請失敗：" + (data.error || "unknown error"));
+      return;
+    }
+
+    setSubmittedClaimByCredId((prev) => ({
+      ...prev,
+      [credId]: data.claim, // 存完整 claim
+    }));
+  } catch (err) {
+    console.error(err);
+    alert("❌ 呼叫 /api/claim/submit 失敗：" + err.message);
+  } finally {
+    setSubmittingId(null);
+  }
+};
+
 
 
 
@@ -362,7 +436,7 @@ const mockCredentialAttrs = {
           <p style={{ color: "#64748b" }}>No credentials found.</p>
         ) : (
           <div style={{ display: "grid", gap: "16px" }}>
-            {credentials.map((cred) => (
+            {sortedCredentials.map((cred) => (
               <div key={cred.id} style={cardStyle}>
                 <p style={{ marginBottom: "6px", fontSize: "15px" }}>
                   <span style={labelStyle}>Credential ID:</span>
@@ -425,11 +499,31 @@ const mockCredentialAttrs = {
                       color: "#064e3b",
                       fontSize: "13px",
                       fontWeight: 600,
-                      marginLeft: "12px",
+                      marginLeft: "15px",
                       cursor: previewingId === cred.id ? "wait" : "pointer",
                     }}
                   >
                     {previewingId === cred.id ? "計算中..." : "試算理賠"}
+                  </button>
+
+                  {/* 送出正式理賠申請 */}
+                  <button
+                    onClick={() => handleSubmitClaim(cred)}
+                    disabled={submittingId === cred.id}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "999px",
+                      border: "1px solid #facc15",
+                      backgroundColor:
+                        submittingId === cred.id ? "#fef9c3" : "#eab308",
+                      color: "#422006",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      marginLeft: "15px",
+                      cursor: submittingId === cred.id ? "wait" : "pointer",
+                    }}
+                  >
+                    {submittingId === cred.id ? "送出中..." : "送出理賠申請"}
                   </button>
 
 
@@ -570,7 +664,27 @@ const mockCredentialAttrs = {
                   </div>
                 )}
 
-
+                {submittedClaimByCredId[cred.id] && (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid #fee2e2",
+                      backgroundColor: "#fef2f2",
+                      fontSize: "12px",
+                      color: "#7f1d1d",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: "4px" }}>
+                      已送出理賠申請
+                    </div>
+                    <div>
+                      Claim ID：{submittedClaimByCredId[cred.id].claimId}（狀態：
+                      {submittedClaimByCredId[cred.id].status}）
+                    </div>
+                  </div>
+                )}
 
 
 

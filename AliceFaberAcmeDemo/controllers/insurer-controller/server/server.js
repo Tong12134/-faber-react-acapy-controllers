@@ -14,6 +14,7 @@ import webhooks from "./src/webhooks.js";
 import * as acapy from "./src/acapy.js";
 import { ensureInsurerSchemaAndCredDef } from "./src/acapy.js";
 import claimpreview from "./src/routes.claimPreview.js";
+// import claimRoutes from "./src/routes.claimPreview.js";
 //import { credAttrsToEncounterDTO, previewClaimFromEncounter } from "./claimPreview.js";
 
 
@@ -45,6 +46,8 @@ app.use("/api/credentialSchemas", credentialSchemas);
 app.use("/api/credentialDefinitions", credentialDefinitions);
 app.use("/api/credentials", credentials);
 app.use("/api/claim", claimpreview);
+// app.use("/api/claim", claimRoutes);
+
 
 // Webhooks（需在 ACA-Py 啟動時指定）
 app.post("/webhooks/topic/:topic", webhooks);
