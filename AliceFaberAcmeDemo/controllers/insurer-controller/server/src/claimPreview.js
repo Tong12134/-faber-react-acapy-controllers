@@ -42,12 +42,10 @@ export function credAttrsToEncounterDTO(attrs) {
 }
 
 // admissionDate / dischargeDate 預期類似 "2025-06-01" 或 ISO 日期字串
-// 這是一個內部輔助函式，不用 export 也沒關係
 function calcStayDays(admissionDate, dischargeDate) {
   if (!admissionDate) return 0;
 
   const start = new Date(admissionDate);
-  // 若沒有 dischargeDate，先當成只住一天
   const end = dischargeDate ? new Date(dischargeDate) : start;
 
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
@@ -55,28 +53,35 @@ function calcStayDays(admissionDate, dischargeDate) {
   }
 
   const diffMs = end.getTime() - start.getTime();
-  if (diffMs < 0) return 0; // 避免出院日比入院日小
+  if (diffMs < 0) return 0; // 避免出院日比入院日早
 
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  return diffDays + 1; // 同一天住院算 1 天
+  const dayMs = 1000 * 60 * 60 * 24;
+  const diffDays = Math.floor(diffMs / dayMs);
+
+  // 少於 1 天也算住 1 天（例如 10/1 下午住進、10/2 早上出院）
+  if (diffDays <= 0) return 1;
+
+  // 其他情況就是實際相差的整天數
+  return diffDays;
 }
+
 
 
 export function previewClaimFromEncounter(dto) {
   let total = 0;
   const reasons = [];
 
-  // 規則 1：住院日額（INPATIENT && 住院 >= 2 天，每天 2000）
+  // 規則 1：住院日額（INPATIENT && 住院 >= 1 天，每天 3000）
   if (dto.encounterClass === "INPATIENT") {
     const days = calcStayDays(dto.admissionDate, dto.dischargeDate);
 
-    if (days >= 2) {
-      const perDay = 2000;
+    if (days >= 1) {
+      const perDay = 3000;
       const amount = days * perDay;
       total += amount;
       reasons.push(`住院 ${days} 天，符合日額給付，每日 ${perDay} 元，共 ${amount} 元`);
     } else {
-      reasons.push(`住院未滿 2 天（${days} 天），不符合日額給付門檻`);
+      reasons.push(`住院未滿 1 天（${days} 天），不符合日額給付門檻`);
     }
   } else {
     reasons.push(
