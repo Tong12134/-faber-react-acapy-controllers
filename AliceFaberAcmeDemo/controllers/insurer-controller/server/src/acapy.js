@@ -20,10 +20,24 @@ export async function ping() {
 
 /** 確保 insurer 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureInsurerSchemaAndCredDef() {
-  const SCHEMA_NAME = "insurance_policy";
-  const SCHEMA_VERSION = "2.0.1";
-  const ATTRIBUTES = ["name", "date", "degree", "birthdate_dateint", "timestamp"];
-  const TAG = "insurance-01"; 
+  const SCHEMA_NAME = "InsurancePolicyV1";
+  const SCHEMA_VERSION = "1.0.0";
+  
+  const ATTRIBUTES = [
+    "policy_id",           // 保單號
+    "insured_id",          // 被保險人 ID（例：身分證字號）
+    "insured_name",        // 被保險人姓名
+    "product_name",        // 商品名稱（例：住院醫療計畫 A）
+    "coverage_type",       // 給付類型（例：HOSPITAL_CASH）
+    "coverage_start_date", // 生效日
+    "coverage_end_date",   // 終止日（或留空）
+    "hospital_daily_cash", // 住院日額（例：2000）
+    "surgery_benefit",     // 手術一次金（例：10000）
+    "timestamp"            // 發行時間
+  
+  ];
+  
+  const TAG = "insurer-policy-v1"; 
 
   // 1) 先找 schema
   const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
@@ -69,7 +83,7 @@ export async function ensureInsurerSchemaAndCredDef() {
       credDefId = res.data.credential_definition_id;
       console.log("IC] [INIT] created cred def:", credDefId);
     } else {
-      console.log("[Ic] [INIT] cred def already exists:", credDefId);
+      console.log("[IC] [INIT] cred def already exists:", credDefId);
     }
 
     return { schemaId, credDefId };

@@ -20,8 +20,40 @@ export default function CredentialsPage() {
   // DID → 顯示名稱
   const DID_LABELS = {
     QWTxizRo9A1tWdEPYkFPHe: "Hospital",
-    // SOMEOTHERDID: "Insurer",
+    HZnimaMX5B9zwh13thnNLG: "Insurer", 
   };
+
+  // 把從 API 回來的 credentials 裝飾一下：補 issuerDid / issuerLabel
+  const decorateCredentials = (rawList = []) =>
+    (rawList || []).map((c) => {
+      // 1) 先從 cred def 拆 DID
+      const credDefId =
+        c.credential_definition_id ||
+        c.cred_def_id ||
+        c.credDefId ||
+        "";
+
+      let issuerDid = c.issuerDid;
+      if (!issuerDid && credDefId) {
+        issuerDid = credDefId.split(":")[0] || "";
+      }
+
+      // 2) cred def 沒有時，再從 schemaId 拆 DID
+      const schemaId = c.schema_id || c.schemaId || "";
+      if (!issuerDid && schemaId) {
+        issuerDid = schemaId.split(":")[0] || "";
+      }
+
+      // 3) issuerLabel：**優先用 DID_LABELS**，再退回原本 c.issuerLabel
+      const issuerLabel =
+        DID_LABELS[issuerDid] || c.issuerLabel || issuerDid || "Unknown Issuer";
+
+      return {
+        ...c,
+        issuerDid,
+        issuerLabel,
+      };
+    });
 
   const INSURER_API_BASE = "http://localhost:5070";
 
@@ -72,7 +104,8 @@ export default function CredentialsPage() {
       const res = await fetch("/api/credentials");
       const data = await res.json();
       if (data.ok) {
-        setCredentials(data.credentials || []);
+        const list = decorateCredentials(data.credentials || []);
+        setCredentials(list);
       } else {
         console.error("Failed to load credentials:", data.error);
       }
@@ -82,6 +115,7 @@ export default function CredentialsPage() {
       setLoadingCreds(false);
     }
   };
+
 
   // 取得待接受 offers
   const fetchOffers = async () => {
@@ -348,7 +382,8 @@ const sortedCredentials = [...(credentials || [])].reverse();
         const checkData = await checkRes.json();
 
         if (checkData.ok) {
-          const list = checkData.credentials || checkData.results || [];
+          const rawList = checkData.credentials || checkData.results || [];
+          const list = decorateCredentials(rawList);
           if (list.length > prevCount) {
             setCredentials(list);
             stored = true;

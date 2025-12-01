@@ -1,43 +1,96 @@
 import { useState, useEffect } from "react";
 
+// 針對特定 Schema 名稱，寫死欄位順序
+const SCHEMA_ATTR_ORDER = {
+  
+  InsurancePolicyV1: [
+    "policy_id",
+    "insured_id",
+    "insured_name",
+    "product_name",
+    "coverage_type",
+    "coverage_start_date",
+    "coverage_end_date",
+    "hospital_daily_cash",
+    "surgery_benefit",
+    "timestamp",
+  ],
+
+  // 如果你現在後端仍然用這種 schema_name，也順便支援
+  // insurance_policy: ["name", "date", "degree", "birthdate_dateint", "timestamp"],
+};
+
+// 每個 schema 的「預設示範值」
+const INSURER_DEMO_VALUES = {
+  policy_id: "POLICY-DEMO-001",
+  insured_id: "patient-001",
+  insured_name: "王小明",
+  product_name: "住院日額險方案 A",
+  coverage_type: "Hospitalization+Surgery",
+  coverage_start_date: "2025-01-01",
+  coverage_end_date: "2026-01-01",
+  hospital_daily_cash: "2000",      // 每日住院日額
+  surgery_benefit: "10000",         // 手術一次金
+  timestamp: "2025-06-01T10:00:00+08:00",
+};
+
+
+// 根據 schemaId + 原本 attrNames，決定最後要用的順序
+const getOrderedAttrNames = (schemaId, attrNames = []) => {
+  const parts = (schemaId || "").split(":");
+
+  // did:sov:xxx:SchemaName:1.0.0 → 通常第 3 個是名稱
+  let schemaName = "";
+  if (parts.length >= 4) {
+    schemaName = parts[2]; // ex: InsurancePolicyV1 
+  } else {
+    schemaName = schemaId;
+  }
+
+  console.log(`[Sort Debug] ID: ${schemaId} -> Parsed Name: ${schemaName}`);
+
+  const customOrder = SCHEMA_ATTR_ORDER[schemaName];
+
+  if (!customOrder) {
+    // 沒寫死順序就照 ACA-Py 回傳原本的順序
+    return attrNames;
+  }
+
+
+  const availableSet = new Set(attrNames);
+
+  // 1) 先把有定義順序 & 實際存在的欄位排好
+  const sorted = customOrder.filter((name) => availableSet.has(name));
+
+  // 2) 如果有新的欄位不在 customOrder 裡，補在最後
+  const sortedSet = new Set(sorted);
+  const others = attrNames.filter((name) => !sortedSet.has(name));
+
+  return [...sorted, ...others];
+};
+
+
+// 根據 schema.attrNames 產生預設的 Attributes JSON
+  const buildAttributesTemplate = (attrNames = [], defaults = {}) =>
+  JSON.stringify(
+    (attrNames || []).map((name) => ({
+      name,
+      // 這樣寫才安全：如果 defaults 裡有就用，沒有就用空字串
+      value: defaults[name] ?? "",
+    })),
+    null,
+    2
+  );
+
+  
+
 export default function CredentialsPage() {
   const [form, setForm] = useState({
     ConnectionId: "",
     SchemaId: "",
     CredentialDefinitionId: "",
-    CredentialAttributesObject: JSON.stringify(
-      [
-        { name: "hospital_id", value: "HOSPITAL-001" },
-        { name: "patient_id", value: "patient-001" },
-        { name: "patient_name", value: "Tom" },
-        { name: "patient_birthdate_dateint", value: "19900101" },
-
-        { name: "encounter_id", value: "E2025-0001" },
-        { name: "encounter_date", value: "2025-06-01" },
-        { name: "encounter_class", value: "INPATIENT" },
-        { name: "encounter_department", value: "Orthopedics" },
-
-        { name: "diagnosis_system", value: "ICD-10" },
-        { name: "diagnosis_code", value: "S7200" },
-        { name: "diagnosis_display", value: "Femur fracture" },
-
-        { name: "admission_date", value: "2025-06-01" },
-        { name: "discharge_date", value: "2025-06-05" },
-
-        { name: "procedure_code", value: "FEMUR-ORIF" },
-        { name: "procedure_display", value: "Open reduction internal fixation" },
-
-        { name: "provider_org_name", value: "Good Hospital" },
-        { name: "provider_org_id", value: "HOSPITAL-001" },
-
-        { name: "record_type", value: "encounter" },
-        { name: "timestamp", value: "2025-06-06T10:00:00+08:00" },
-        { name: "fhir_bundle_id", value: "bundle-demo-001" },
-        { name: "fhir_bundle_hash", value: "hash-demo-001" },
-      ],
-      null,
-      2
-    ),
+    // 一開始先給空陣列，選到 Schema 後再自動帶欄位
+    CredentialAttributesObject: "[]",
   });
 
   const [connections, setConnections] = useState([]);
@@ -45,10 +98,6 @@ export default function CredentialsPage() {
   const [credDefs, setCredDefs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [previewingId, setPreviewingId] = useState(null);
-  const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({});
-
-
 
   // 初始化
   useEffect(() => {
@@ -83,6 +132,63 @@ export default function CredentialsPage() {
       return true;
     } catch {
       return false;
+    }
+  };
+
+  // 選到 Schema：去後端拿 attrNames，重建 Attributes JSON
+  const handleSchemaChange = async (e) => {
+    const schemaId = e.target.value;
+
+    // 先記住現在選哪個 schema
+    updateField("SchemaId", schemaId);
+
+    if (!schemaId) {
+      // 清空選擇 → 把 attributes 也清空
+      updateField("CredentialAttributesObject", "[]");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `/api/credentialSchemas/${encodeURIComponent(schemaId)}`
+      );
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.error || "Failed to load schema");
+      }
+
+      // 後端可能回傳的結構：
+      // { schema: { attrNames: [...] } } or { result: { schema: { attrNames: [...] } } }
+      const schemaObj =
+        data.schema || data.result?.schema || data.result || data;
+
+      const attrNames =
+        schemaObj?.attrNames || schemaObj?.schema?.attrNames || [];
+
+      console.log("[Insurer Schema debug] schemaId =", schemaId);
+      console.log("[Insurer Schema debug] raw attrNames =", attrNames);
+
+      // 套用「寫死順序」：用 attrNames 當 rawAttrNames 傳進去
+      const finalAttrNames = getOrderedAttrNames(schemaId, attrNames);
+      console.log("[Insurer Schema debug] finalAttrNames =", finalAttrNames);
+
+      
+    // 先從 schemaId 判斷 schemaName
+    const parts = schemaId.split(":");
+    const schemaName = parts.length >= 3 ? parts[2] : schemaId;
+
+    // 如果未來有別的 schema 不想帶預設，可以在這裡判斷
+    const defaults =
+      schemaName === "InsurancePolicyV1" ? INSURER_DEMO_VALUES : {};
+
+    updateField(
+      "CredentialAttributesObject",
+      buildAttributesTemplate(finalAttrNames, defaults)
+    );
+
+    } catch (err) {
+      console.error("load schema error:", err);
+      setMessage("⚠️ Failed to load schema attributes: " + err.message);
     }
   };
 
@@ -131,7 +237,7 @@ export default function CredentialsPage() {
         minHeight: "70vh",
       }}
     >
-      {/*  頁面標題 */}
+      {/* 頁面標題 */}
       <h2
         style={{
           color: "#003366",
@@ -141,9 +247,11 @@ export default function CredentialsPage() {
           marginBottom: "16px",
           fontWeight: 600,
         }}
-      > Issue Credential </h2>
+      >
+        Issue Credential
+      </h2>
 
-      {/*  狀態提示框 */}
+      {/* 狀態提示框 */}
       {message && (
         <div
           style={{
@@ -162,7 +270,7 @@ export default function CredentialsPage() {
         </div>
       )}
 
-      {/* ✅ 表單區塊 */}
+      {/* 表單 */}
       <form
         onSubmit={handleSubmit}
         style={{
@@ -174,7 +282,9 @@ export default function CredentialsPage() {
       >
         {/* Connection */}
         <div style={{ marginBottom: "16px" }}>
-          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+          <label
+            style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}
+          >
             Connection
           </label>
           <select
@@ -201,12 +311,14 @@ export default function CredentialsPage() {
 
         {/* Schema */}
         <div style={{ marginBottom: "16px" }}>
-          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+          <label
+            style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}
+          >
             Schema
           </label>
           <select
             value={form.SchemaId}
-            onChange={(e) => updateField("SchemaId", e.target.value)}
+            onChange={handleSchemaChange}
             required
             style={{
               width: "100%",
@@ -228,7 +340,9 @@ export default function CredentialsPage() {
 
         {/* Credential Definition */}
         <div style={{ marginBottom: "16px" }}>
-          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+          <label
+            style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}
+          >
             Credential Definition
           </label>
           <select
@@ -257,7 +371,9 @@ export default function CredentialsPage() {
 
         {/* Attributes */}
         <div style={{ marginBottom: "20px" }}>
-          <label style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}>
+          <label
+            style={{ fontWeight: 500, color: "#003366", fontSize: "21px" }}
+          >
             Credential Attributes (JSON Array)
           </label>
           <textarea
@@ -277,12 +393,14 @@ export default function CredentialsPage() {
               fontSize: "14px",
               backgroundColor: "#f9faff",
               lineHeight: "1.5",
-              resize: "vertical", // 允許使用者拖拉改大小（上下）
-              boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)", // 內陰影，看起來更有層次
+              resize: "vertical",
+              boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)",
             }}
           ></textarea>
           {!isValidJson(form.CredentialAttributesObject) && (
-            <p style={{ color: "red", marginTop: "6px" }}> Invalid JSON format!</p>
+            <p style={{ color: "red", marginTop: "6px" }}>
+              Invalid JSON format!
+            </p>
           )}
         </div>
 
