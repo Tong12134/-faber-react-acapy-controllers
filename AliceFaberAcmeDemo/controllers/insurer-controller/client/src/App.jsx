@@ -286,7 +286,7 @@ export default function App() {
                     {
                       to: "/credentials",
                       label: "Issued Credentials",
-                      desc: "查看與管理已發行的憑證",
+                      desc: " 發保險憑證與其狀態",
                       color: "#10b981",
                     },
                     {

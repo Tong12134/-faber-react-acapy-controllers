@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-const INSURER_API_BASE =
-  process.env.NEXT_PUBLIC_INSURER_API_BASE || "http://localhost:5070";
+const INSURER_API_BASE = "http://localhost:5070";
+
 const DEMO_INSURED_ID = "patient-001";
 
 export default function MyClaimsPage() {

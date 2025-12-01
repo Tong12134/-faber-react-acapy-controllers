@@ -4,6 +4,7 @@ import AgentStatus from "./components/AgentStatus.jsx";
 import Connections from "./pages/Connections.jsx";
 import ProofRequests from "./pages/ProofRequests.jsx";
 import Credentials from "./pages/Credentials.jsx";
+import MyClaimsPage from "./pages/MyClaimsPage.jsx";
 
 export default function App() {
   const location = useLocation();
@@ -18,6 +19,7 @@ export default function App() {
     { to: "/connections", label: "Connections" },
     { to: "/credentials", label: "Credentials" },
     { to: "/proofRequests", label: "Proofs" },
+    { to: "/myClaims", label: "My Claims" },
   ];
 
   return (
@@ -254,7 +256,7 @@ export default function App() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                     gap: "24px",
                   }}
                 >
@@ -262,7 +264,7 @@ export default function App() {
                     {
                       to: "/connections",
                       label: "Connections",
-                      desc: "與醫院與保險公司建立安全連線",
+                      desc: "建立與管理安全的點對點連線",
                       color: "#3b82f6",
                     },
                     {
@@ -277,6 +279,12 @@ export default function App() {
                       desc: "決定是否出示資料給保險公司驗證",
                       color: "#f97316",
                     },
+                    {
+                      to: "/myClaims",
+                      label: "My Claims",
+                      desc: "查看你提交的理賠申請狀態與歷史紀錄",
+                      color: "#8b5cf6",
+                    }
                   ].map(({ to, label, desc, color }) => (
                     <Link key={to} to={to} style={{ textDecoration: "none" }}>
                       <div
@@ -359,6 +367,7 @@ export default function App() {
           <Route path="/connections" element={<Connections />} />
           <Route path="/proofRequests" element={<ProofRequests />} />
           <Route path="/credentials" element={<Credentials />} />
+          <Route path="/myClaims" element={<MyClaimsPage />} />
           <Route
             path="*"
             element={

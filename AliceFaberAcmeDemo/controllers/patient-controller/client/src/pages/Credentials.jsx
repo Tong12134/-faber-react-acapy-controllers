@@ -12,7 +12,10 @@ export default function CredentialsPage() {
   const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({}); // { [credId]: previewResult }
   const [submittingId, setSubmittingId] = useState(null);
   const [submittedClaimByCredId, setSubmittedClaimByCredId] = useState({});
-
+  // 每張 credential 各自的欄位勾選狀態：{ [credId]: Set<string> (的替代品) }
+  const [selectedAttrsByCredId, setSelectedAttrsByCredId] = useState({});
+  const [selectingPreviewForId, setSelectingPreviewForId] = useState(null); 
+ 
 
   // DID → 顯示名稱
   const DID_LABELS = {
@@ -51,7 +54,14 @@ export default function CredentialsPage() {
 
 //
 
+  // 原始 attrs（優先用 credential 真的 attr，沒有就用 mock）
+  const getRawAttrsForCred = (cred) =>
+    cred.attrs && Object.keys(cred.attrs).length > 0
+      ? cred.attrs
+      : mockCredentialAttrs;
 
+
+      
 
 
 
@@ -133,10 +143,12 @@ export default function CredentialsPage() {
     setPreviewingId(credId);
 
     // attrs：優先用真正憑證裡的 attrs，沒有的時候就 fallback 到 mock
-    const attrs =
-      cred.attrs && Object.keys(cred.attrs).length > 0
-        ? cred.attrs
-        : mockCredentialAttrs;
+    // const attrs =
+    //   cred.attrs && Object.keys(cred.attrs).length > 0
+    //     ? cred.attrs
+    //     : mockCredentialAttrs;
+    // 根據 UI 勾選結果拿 attrs
+    const attrs = getSelectedAttrsForCred(cred);
 
     try {
       const res = await fetch(
@@ -191,6 +203,68 @@ const sortedCredentials = [...(credentials || [])].reverse();
 // });
 
 
+  // 統一計算「這張 credential 最後要送出去的 attrs」
+  // 如果有勾選，就只回傳勾選的 subset；如果沒有，就用全套 attrs / mock。
+  const getSelectedAttrsForCred = (cred) => {
+    const rawAttrs =
+      cred.attrs && Object.keys(cred.attrs).length > 0
+        ? cred.attrs
+        : mockCredentialAttrs;
+
+    const selectedKeys = selectedAttrsByCredId[cred.id];
+
+    // 沒有任何記錄，或 size 為 0 → 視為「全部揭露」
+    if (!selectedKeys || selectedKeys.size === 0) {
+      return rawAttrs;
+    }
+
+    // 建 subset
+    const subset = {};
+    for (const [key, value] of Object.entries(rawAttrs)) {
+      if (selectedKeys.has(key)) {
+        subset[key] = value;
+      }
+    }
+
+    // 如果 subset 變成空的（理論上不會，但保險一下），就回整包
+    if (Object.keys(subset).length === 0) {
+      return rawAttrs;
+    }
+    return subset;
+  };
+
+
+    const openPreviewSelector = (cred) => {
+    const credId = cred.id;
+    if (!credId) return;
+
+    // 如果這張已經在選欄位了 → 當作 toggle 關掉
+    if (selectingPreviewForId === credId) {
+      setSelectingPreviewForId(null);
+      return;
+    }
+
+    // 開啟「理賠試算欄位選擇」面板
+    setSelectingPreviewForId(credId);
+
+    // 同時關掉 Attributes 面板
+    if (expandedId === credId) {
+      setExpandedId(null);
+    }
+
+    // 如果這張還沒有自訂選擇，預設全部勾選
+    setSelectedAttrsByCredId((prev) => {
+      if (prev[credId]) return prev;
+
+      const rawAttrs = getRawAttrsForCred(cred);
+      const allKeys = Object.keys(rawAttrs || {});
+      return {
+        ...prev,
+        [credId]: new Set(allKeys),
+      };
+    });
+  };
+
 
   const handleSubmitClaim = async (cred) => {
   const credId = cred.id;
@@ -199,10 +273,12 @@ const sortedCredentials = [...(credentials || [])].reverse();
   setSubmittingId(credId);
 
   // attrs：一樣優先用真的 cred.attrs，沒有就用 mock
-  const attrs =
-    cred.attrs && Object.keys(cred.attrs).length > 0
-      ? cred.attrs
-      : mockCredentialAttrs;
+  // const attrs =
+  //   cred.attrs && Object.keys(cred.attrs).length > 0
+  //     ? cred.attrs
+  //     : mockCredentialAttrs;
+  const attrs = getSelectedAttrsForCred(cred);
+
 
   try {
     const res = await fetch(`${INSURER_API_BASE}/api/claim/submit`, {
@@ -230,6 +306,7 @@ const sortedCredentials = [...(credentials || [])].reverse();
     alert("❌ 呼叫 /api/claim/submit 失敗：" + err.message);
   } finally {
     setSubmittingId(null);
+    setSelectingPreviewForId(null);   // 試算完收起選欄位面板
   }
 };
 
@@ -471,9 +548,20 @@ const sortedCredentials = [...(credentials || [])].reverse();
                 >
                   {/* 左邊：Show / Hide attributes */}
                   <button
-                    onClick={() =>
-                      setExpandedId(expandedId === cred.id ? null : cred.id)
-                    }
+                    onClick={() =>{
+                      if (expandedId === cred.id) {
+                        // 原本是開的 → 關掉
+                        setExpandedId(null);
+                      } else {
+                        // 要打開 Attributes
+                        setExpandedId(cred.id);
+
+                        // 如果理賠試算欄位選擇現在是這張，也一起關掉
+                        if (selectingPreviewForId === cred.id) {
+                          setSelectingPreviewForId(null);
+                        }
+                      }
+                    }}
                     style={{
                       padding: "6px 12px",
                       borderRadius: "999px",
@@ -488,7 +576,7 @@ const sortedCredentials = [...(credentials || [])].reverse();
 
                   {/* 中間：試算理賠 */}
                   <button
-                    onClick={() => handlePreviewClaim(cred)}
+                    onClick={() => openPreviewSelector(cred)}
                     disabled={previewingId === cred.id}
                     style={{
                       padding: "6px 12px",
@@ -550,29 +638,28 @@ const sortedCredentials = [...(credentials || [])].reverse();
                     {deletingId === cred.id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
-
-                {expandedId === cred.id && cred.attrs && (
-                  <div
-                    style={{
-                      marginTop: "12px",
-                      borderRadius: "12px",
-                      background: "#f9fafb",
-                      border: "1px solid #e2e8f0",
-                      padding: "14px 16px",
-                    }}
-                  >
+                  {expandedId === cred.id && cred.attrs && (
                     <div
                       style={{
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        marginBottom: "8px",
-                        color: "#0f172a",
+                        marginTop: "12px",
+                        borderRadius: "12px",
+                        background: "#f9fafb",
+                        border: "1px solid #e2e8f0",
+                        padding: "14px 16px",
                       }}
                     >
-                      Attributes
-                    </div>
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          marginBottom: "8px",
+                          color: "#0f172a",
+                        }}
+                      >
+                          Attributes
+                        </div>
 
-                    <dl
+                         <dl
                       style={{
                         display: "grid",
                         gridTemplateColumns:
@@ -621,7 +708,212 @@ const sortedCredentials = [...(credentials || [])].reverse();
                   </div>
                 )}
 
-                                {/* 預估理賠結果 */}
+                                {/* 理賠試算前的欄位選擇面板 */}
+                {selectingPreviewForId === cred.id && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      borderRadius: "12px",
+                      background: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: "#1d4ed8",
+                        }}
+                      >
+                        選擇要揭露給保險公司的欄位
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // 全選：重設為 undefined → getSelectedAttrsForCred 會當作全部
+                            setSelectedAttrsByCredId((prev) => {
+                              const next = { ...prev };
+                              delete next[cred.id];
+                              return next;
+                            });
+                          }}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            fontSize: "11px",
+                            color: "#2563eb",
+                            cursor: "pointer",
+                          }}
+                        >
+                          全選
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // 全部取消：這張存一個空 Set
+                            setSelectedAttrsByCredId((prev) => ({
+                              ...prev,
+                              [cred.id]: new Set(),
+                            }));
+                          }}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            fontSize: "11px",
+                            color: "#64748b",
+                            cursor: "pointer",
+                          }}
+                        >
+                          全部取消
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        maxHeight: "180px",
+                        overflowY: "auto",
+                        paddingRight: "4px",
+                        marginBottom: "10px",
+                      }}
+                    >
+                      {Object.entries(getRawAttrsForCred(cred)).map(
+                        ([key, value]) => {
+                          const selectedSet = selectedAttrsByCredId[cred.id];
+                          const checked = selectedSet
+                            ? selectedSet.has(key)
+                            : true; // 沒紀錄時預設勾選全部
+
+                          return (
+                            <label
+                              key={key}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                fontSize: "12px",
+                                marginBottom: "4px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setSelectedAttrsByCredId((prev) => {
+                                    let current = prev[cred.id];
+
+                                    if (!current) {
+                                      current = new Set(
+                                        Object.keys(
+                                          getRawAttrsForCred(cred) || {}
+                                        )
+                                      );
+                                    } else {
+                                      current = new Set(current);
+                                    }
+
+                                    if (isChecked) {
+                                      current.add(key);
+                                    } else {
+                                      current.delete(key);
+                                    }
+
+                                    return {
+                                      ...prev,
+                                      [cred.id]: current,
+                                    };
+                                  });
+                                }}
+                              />
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 8px",
+                                  borderRadius: "999px",
+                                  backgroundColor: checked
+                                    ? "#dbeafe"
+                                    : "#e5e7eb",
+                                  color: "#1f2937",
+                                  minWidth: "120px",
+                                  textAlign: "right",
+                                }}
+                              >
+                                {key}
+                              </span>
+                              <span
+                                style={{
+                                  flex: 1,
+                                  color: "#0f172a",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {value}
+                              </span>
+                            </label>
+                          );
+                        }
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: "8px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectingPreviewForId(null)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "999px",
+                          border: "1px solid #cbd5f5",
+                          backgroundColor: "white",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewClaim(cred)}
+                        disabled={previewingId === cred.id}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "999px",
+                          border: "none",
+                          backgroundColor:
+                            previewingId === cred.id ? "#bfdbfe" : "#2563eb",
+                          color: "white",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor:
+                            previewingId === cred.id ? "wait" : "pointer",
+                        }}
+                      >
+                        {previewingId === cred.id ? "計算中..." : "確定試算"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+
+
+                {/* 預估理賠結果 */}
                 {claimPreviewByCredId[cred.id] && (
                   <div
                     style={{
