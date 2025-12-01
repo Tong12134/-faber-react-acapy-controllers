@@ -32,6 +32,38 @@ const SCHEMA_ATTR_ORDER = {
   // "did:schema:...:OtherSchema:1.0.0": ["fieldA", "fieldB", "fieldC"],
 };
 
+
+// Demo 預設值：只給 HospitalEncounterSummaryV1 用
+const HOSPITAL_DEMO_VALUES = {
+  patient_id: "patient-001",
+  patient_name: "王小明",
+  patient_birthdate_dateint: "19900101",
+
+  encounter_id: "E2025-0001",
+  encounter_date: "2025-06-01",
+  encounter_class: "INPATIENT",
+  encounter_department: "Orthopedics",
+
+  diagnosis_system: "ICD-10",
+  diagnosis_code: "S7200",
+  diagnosis_display: "Femur fracture",
+
+  admission_date: "2025-06-01",
+  discharge_date: "2025-06-05",
+
+  procedure_code: "FEMUR-ORIF",
+  procedure_display: "Open reduction internal fixation",
+
+  provider_org_name: "Good Hospital",
+  provider_org_id: "HOSPITAL-001",
+
+  fhir_bundle_id: "bundle-demo-001",
+  fhir_bundle_hash: "hash-demo-001",
+  record_type: "encounter",
+  timestamp: "2025-06-06T10:00:00+08:00",
+};
+
+
 // 根據 schemaId + 原本 attrNames，決定最後要用的順序
 const getOrderedAttrNames = (schemaId, attrNames = []) => {
 
@@ -76,11 +108,13 @@ const getOrderedAttrNames = (schemaId, attrNames = []) => {
 };
 
 // 根據 schema.attrNames 產生預設的 Attributes JSON
-const buildAttributesTemplate = (attrNames = []) =>
+// 修改參數：多收一個 defaults，預設為空物件 {}，這樣才不會報錯
+const buildAttributesTemplate = (attrNames = [], defaults = {}) =>
   JSON.stringify(
     (attrNames || []).map((name) => ({
       name,
-      value: "",
+      // 這樣寫才安全：如果 defaults 裡有就用，沒有就用空字串
+      value: defaults[name] ?? "",
     })),
     null,
     2
@@ -193,11 +227,25 @@ export default function CredentialsPage() {
 
     console.log("[Schema debug] finalAttrNames =", finalAttrNames);
 
-    // 用「排好順序的 finalAttrNames」重建 Attributes JSON
+    // // 用「排好順序的 finalAttrNames」重建 Attributes JSON
+    // updateField(
+    //   "CredentialAttributesObject",
+    //   buildAttributesTemplate(finalAttrNames)
+    // );
+
+    // 先從 schemaId 判斷 schemaName
+    const parts = schemaId.split(":");
+    const schemaName = parts.length >= 3 ? parts[2] : schemaId;
+
+    // 如果是 HospitalEncounterSummaryV1，就帶 demo 值；其他 schema 就用空值
+    const defaults =
+      schemaName === "HospitalEncounterSummaryV1" ? HOSPITAL_DEMO_VALUES : {};
+
     updateField(
       "CredentialAttributesObject",
-      buildAttributesTemplate(finalAttrNames)
+      buildAttributesTemplate(finalAttrNames, defaults)
     );
+
   } catch (err) {
     console.error("load schema error:", err);
     setMessage("⚠️ Failed to load schema attributes: " + err.message);

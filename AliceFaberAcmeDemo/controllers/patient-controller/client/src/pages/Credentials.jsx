@@ -131,8 +131,8 @@ const mockCredentialAttrs = {
 
     try {
       const res = await fetch(
-        // 這裡的 URL 請換成你 insurer backend 的真正位置
-        "http://localhost:3000/api/claim/preview-from-hospital-credential",
+        // 這裡的 URL 為 insurer backend 的真正位置
+        "http://localhost:5070/api/claim/preview-from-hospital-credential",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -425,6 +425,7 @@ const mockCredentialAttrs = {
                       color: "#064e3b",
                       fontSize: "13px",
                       fontWeight: 600,
+                      marginLeft: "12px",
                       cursor: previewingId === cred.id ? "wait" : "pointer",
                     }}
                   >

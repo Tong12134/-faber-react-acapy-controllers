@@ -5,22 +5,39 @@ export function credAttrsToEncounterDTO(attrs) {
   const get = (name) => (attrs[name] !== undefined ? String(attrs[name]) : null);
 
   return {
-    hospitalId: get("hospital_id"),
-    encounterId: get("encounter_id"),
+    // 這裡用 provider_org_id 當 hospitalId
+    hospitalId: get("provider_org_id"),
+    hospitalName: get("provider_org_name"),
 
+    // 病人資訊
+    patientId: get("patient_id"),
+    patientName: get("patient_name"),
+    patientBirthdate: get("patient_birthdate_dateint"),
+
+    // Encounter 基本資訊
+    encounterId: get("encounter_id"),
     encounterClass: get("encounter_class") || "UNKNOWN",
     encounterDepartment: get("encounter_department"),
-
     encounterDate: get("encounter_date"),
+
+    // 時間：用這兩個算住院天數
     admissionDate: get("admission_date"),
     dischargeDate: get("discharge_date"),
 
+    // 診斷
     diagnosisSystem: get("diagnosis_system"),
     diagnosisCode: get("diagnosis_code"),
     diagnosisDisplay: get("diagnosis_display"),
 
+    // 手術
     procedureCode: get("procedure_code"),
     procedureDisplay: get("procedure_display"),
+
+    // 其他 metadata
+    fhirBundleId: get("fhir_bundle_id"),
+    fhirBundleHash: get("fhir_bundle_hash"),
+    recordType: get("record_type"),
+    timestamp: get("timestamp"),
   };
 }
 

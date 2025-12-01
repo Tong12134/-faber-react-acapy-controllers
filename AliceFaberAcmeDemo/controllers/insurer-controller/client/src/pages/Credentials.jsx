@@ -7,11 +7,33 @@ export default function CredentialsPage() {
     CredentialDefinitionId: "",
     CredentialAttributesObject: JSON.stringify(
       [
-        { name: "name", value: "Alice Smith" },
-        { name: "date", value: "2020-01-01" },
-        { name: "degree", value: "Maths" },
-        { name: "birthdate_dateint", value: "20000101" },
-        { name: "timestamp", value: "24" },
+        { name: "hospital_id", value: "HOSPITAL-001" },
+        { name: "patient_id", value: "patient-001" },
+        { name: "patient_name", value: "Tom" },
+        { name: "patient_birthdate_dateint", value: "19900101" },
+
+        { name: "encounter_id", value: "E2025-0001" },
+        { name: "encounter_date", value: "2025-06-01" },
+        { name: "encounter_class", value: "INPATIENT" },
+        { name: "encounter_department", value: "Orthopedics" },
+
+        { name: "diagnosis_system", value: "ICD-10" },
+        { name: "diagnosis_code", value: "S7200" },
+        { name: "diagnosis_display", value: "Femur fracture" },
+
+        { name: "admission_date", value: "2025-06-01" },
+        { name: "discharge_date", value: "2025-06-05" },
+
+        { name: "procedure_code", value: "FEMUR-ORIF" },
+        { name: "procedure_display", value: "Open reduction internal fixation" },
+
+        { name: "provider_org_name", value: "Good Hospital" },
+        { name: "provider_org_id", value: "HOSPITAL-001" },
+
+        { name: "record_type", value: "encounter" },
+        { name: "timestamp", value: "2025-06-06T10:00:00+08:00" },
+        { name: "fhir_bundle_id", value: "bundle-demo-001" },
+        { name: "fhir_bundle_hash", value: "hash-demo-001" },
       ],
       null,
       2
@@ -23,6 +45,10 @@ export default function CredentialsPage() {
   const [credDefs, setCredDefs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [previewingId, setPreviewingId] = useState(null);
+  const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({});
+
+
 
   // 初始化
   useEffect(() => {
