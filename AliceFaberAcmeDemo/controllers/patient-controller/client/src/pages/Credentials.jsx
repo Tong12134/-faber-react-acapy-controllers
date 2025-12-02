@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-// DID → 顯示名稱
+// 1. 定義 DID 常數
 const HOSPITAL_DID = "QWTxizRo9A1tWdEPYkFPHe";
 const INSURER_DID = "HZnimaMX5B9zwh13thnNLG";
 
@@ -12,457 +12,414 @@ const DID_LABELS = {
 export default function CredentialsPage() {
   const [credentials, setCredentials] = useState([]);
   const [offers, setOffers] = useState([]);
+  
+  // UI Loading States
   const [loadingCreds, setLoadingCreds] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(true);
+  
+  // Actions States
   const [acceptingId, setAcceptingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [previewingId, setPreviewingId] = useState(null); // 哪一張 credential 正在試算
-  const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({}); // { [credId]: previewResult }
+  
+  // Claim Logic States
+  const [previewingId, setPreviewingId] = useState(null); 
+  const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({});
   const [submittingId, setSubmittingId] = useState(null);
   const [submittedClaimByCredId, setSubmittedClaimByCredId] = useState({});
   const [selectedAttrsByCredId, setSelectedAttrsByCredId] = useState({});
   const [selectingPreviewForId, setSelectingPreviewForId] = useState(null);
 
-  const INSURER_API_BASE = "http://localhost:5070";
+  // Tab 狀態
+  const [activeTab, setActiveTab] = useState("hospital"); // 'hospital' | 'insurer'
 
-  // 假資料，或之後從登入狀態拿
+  const INSURER_API_BASE = "http://localhost:5070";
   const DEMO_INSURED_ID = "patient-001";
   const DEMO_POLICY_ID = "POLICY-DEMO-001";
 
-  // Hosptial demo attrs
+  // Mock Data & Helpers
   const mockCredentialAttrs = {
     hospital_id: "HOSPITAL-001",
     encounter_id: "E2025-0001",
-    encounter_class: "INPATIENT",
-    encounter_department: "Orthopedics",
-    encounter_date: "2025-06-01",
-    admission_date: "2025-06-01",
-    discharge_date: "2025-06-05",
-    diagnosis_system: "ICD-10",
     diagnosis_code: "S7200",
     diagnosis_display: "Femur fracture",
-    procedure_code: "FEMUR-ORIF",
-    procedure_display: "Open reduction internal fixation",
-    provider_org_name: "Good Hospital",
-    provider_org_id: "HOSPITAL-001",
-    record_type: "encounter",
     timestamp: "2025-06-06T10:00:00+08:00",
   };
 
-  // 原始 attrs（優先用 credential 真的 attr，沒有就用 mock）
   const getRawAttrsForCred = (cred) =>
-    cred.attrs && Object.keys(cred.attrs).length > 0
-      ? cred.attrs
-      : mockCredentialAttrs;
+    cred.attrs && Object.keys(cred.attrs).length > 0 ? cred.attrs : mockCredentialAttrs;
 
-  // 把從 API 回來的 credentials 裝飾一下：補 issuerDid / issuerLabel（確保可讀）
   const decorateCredentials = (rawList = []) =>
     (rawList || []).map((c) => {
-      const credDefId =
-        c.credential_definition_id || c.cred_def_id || c.credDefId || "";
-      const schemaId = c.schema_id || c.schemaId || "";
-
+      const credDefId = c.credential_definition_id || c.cred_def_id || "";
+      const schemaId = c.schema_id || "";
       let issuerDid = c.issuerDid;
-      if (!issuerDid && credDefId) {
-        issuerDid = credDefId.split(":")[0] || "";
-      }
-      if (!issuerDid && schemaId) {
-        issuerDid = schemaId.split(":")[0] || "";
-      }
-
-      const issuerLabel =
-        DID_LABELS[issuerDid] || c.issuerLabel || issuerDid || "Unknown Issuer";
-
-      return {
-        ...c,
-        issuerDid,
-        issuerLabel,
-      };
+      if (!issuerDid && credDefId) issuerDid = credDefId.split(":")[0] || "";
+      if (!issuerDid && schemaId) issuerDid = schemaId.split(":")[0] || "";
+      const issuerLabel = DID_LABELS[issuerDid] || c.issuerLabel || issuerDid || "Unknown Issuer";
+      return { ...c, issuerDid, issuerLabel };
     });
 
-  // 取得已儲存的 credentials
+  // API Calls
   const fetchCredentials = async () => {
     setLoadingCreds(true);
     try {
       const res = await fetch("/api/credentials");
       const data = await res.json();
-      if (data.ok) {
-        const list = decorateCredentials(data.credentials || []);
-        setCredentials(list);
-      } else {
-        console.error("Failed to load credentials:", data.error);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingCreds(false);
-    }
+      if (data.ok) setCredentials(decorateCredentials(data.credentials || []));
+    } catch (err) { console.error(err); } finally { setLoadingCreds(false); }
   };
 
-  // 取得待接受 offers
   const fetchOffers = async () => {
     setLoadingOffers(true);
     try {
       const res = await fetch("/api/credentialOffers");
       const data = await res.json();
-      if (data.ok) {
-        setOffers(data.offers || []);
-      } else {
-        console.error("Failed to load offers:", data.error);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingOffers(false);
-    }
+      if (data.ok) setOffers(data.offers || []);
+    } catch (err) { console.error(err); } finally { setLoadingOffers(false); }
   };
 
   const handleDeleteCredential = async (credId) => {
-    if (!credId) return;
-
-    const ok = window.confirm("確定要刪除這張 Credential 嗎？");
-    if (!ok) return;
-
+    if (!window.confirm("確定要刪除這張 Credential 嗎？")) return;
     setDeletingId(credId);
     try {
-      const res = await fetch(`/api/credentials/${credId}/remove`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/credentials/${credId}/remove`, { method: "POST" });
       const data = await res.json();
-
-      if (!data.ok) {
-        alert("❌ 刪除失敗：" + data.error);
-        return;
-      }
-
-      setCredentials((prev) => (prev || []).filter((c) => c.id !== credId));
-      if (expandedId === credId) {
-        setExpandedId(null);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("❌ 刪除時發生錯誤：" + err.message);
-    } finally {
-      setDeletingId(null);
-    }
+      if (!data.ok) throw new Error(data.error);
+      setCredentials((prev) => prev.filter((c) => c.id !== credId));
+    } catch (err) { alert("❌ 刪除失敗：" + err.message); } finally { setDeletingId(null); }
   };
 
-  // 統一計算「這張 credential 最後要送出去的 attrs」
+  const handleAccept = async (offerId) => {
+    setAcceptingId(offerId);
+    try {
+      const res = await fetch(`/api/credentialOffers/${offerId}/accept`, { method: "POST" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      
+      let tries = 0;
+      let stored = false;
+      while (tries < 8 && !stored) {
+        await new Promise((r) => setTimeout(r, 500));
+        const checkRes = await fetch("/api/credentials");
+        const checkData = await checkRes.json();
+        if (checkData.ok && decorateCredentials(checkData.credentials).length > credentials.length) {
+          setCredentials(decorateCredentials(checkData.credentials));
+          stored = true;
+        }
+        tries++;
+      }
+      await fetchOffers();
+    } catch (err) { alert("❌ Accept Error: " + err.message); } finally { setAcceptingId(null); }
+  };
+
+  // Claim Logic
   const getSelectedAttrsForCred = (cred) => {
     const rawAttrs = getRawAttrsForCred(cred);
     const selectedKeys = selectedAttrsByCredId[cred.id];
-
-    if (!selectedKeys || selectedKeys.size === 0) {
-      return rawAttrs;
-    }
-
+    if (!selectedKeys || selectedKeys.size === 0) return rawAttrs;
     const subset = {};
     for (const [key, value] of Object.entries(rawAttrs)) {
-      if (selectedKeys.has(key)) {
-        subset[key] = value;
-      }
+      if (selectedKeys.has(key)) subset[key] = value;
     }
-    if (Object.keys(subset).length === 0) {
-      return rawAttrs;
-    }
-    return subset;
-  };
-
-  const handlePreviewClaim = async (cred) => {
-    const credId = cred.id;
-    if (!credId) return;
-
-    setPreviewingId(credId);
-    const attrs = getSelectedAttrsForCred(cred);
-
-    try {
-      const res = await fetch(
-        "http://localhost:5070/api/claim/preview-from-hospital-credential",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            credentialAttrs: attrs,
-          }),
-        }
-      );
-
-      const data = await res.json();
-      if (!data.ok) {
-        alert("❌ 試算失敗：" + (data.error || "unknown error"));
-        return;
-      }
-
-      setClaimPreviewByCredId((prev) => ({
-        ...prev,
-        [credId]: data.preview,
-      }));
-    } catch (err) {
-      console.error(err);
-      alert("❌ 呼叫理賠試算 API 失敗：" + err.message);
-    } finally {
-      setPreviewingId(null);
-    }
+    return Object.keys(subset).length === 0 ? rawAttrs : subset;
   };
 
   const openPreviewSelector = (cred) => {
-    const credId = cred.id;
-    if (!credId) return;
+    if (selectingPreviewForId === cred.id) { setSelectingPreviewForId(null); return; }
+    setSelectingPreviewForId(cred.id);
+    setExpandedId(null); 
+    setSelectedAttrsByCredId((prev) => prev[cred.id] ? prev : { ...prev, [cred.id]: new Set(Object.keys(getRawAttrsForCred(cred))) });
+  };
 
-    if (selectingPreviewForId === credId) {
-      setSelectingPreviewForId(null);
-      return;
-    }
-
-    setSelectingPreviewForId(credId);
-
-    // 打開理賠試算欄位選擇時關掉 attributes
-    if (expandedId === credId) {
-      setExpandedId(null);
-    }
-
-    setSelectedAttrsByCredId((prev) => {
-      if (prev[credId]) return prev;
-      const rawAttrs = getRawAttrsForCred(cred);
-      const allKeys = Object.keys(rawAttrs || {});
-      return {
-        ...prev,
-        [credId]: new Set(allKeys),
-      };
-    });
+  const handlePreviewClaim = async (cred) => {
+    setPreviewingId(cred.id);
+    try {
+      const res = await fetch("http://localhost:5070/api/claim/preview-from-hospital-credential", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialAttrs: getSelectedAttrsForCred(cred) }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      setClaimPreviewByCredId((prev) => ({ ...prev, [cred.id]: data.preview }));
+    } catch (err) { alert("❌ 試算失敗：" + err.message); } finally { setPreviewingId(null); }
   };
 
   const handleSubmitClaim = async (cred) => {
-    const credId = cred.id;
-    if (!credId) return;
-
-    setSubmittingId(credId);
-    const attrs = getSelectedAttrsForCred(cred);
-
+    setSubmittingId(cred.id);
     try {
       const res = await fetch(`${INSURER_API_BASE}/api/claim/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          credentialAttrs: attrs,
-          insuredId: DEMO_INSURED_ID,
-          policyId: DEMO_POLICY_ID,
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.ok) {
-        alert("❌ 送出理賠申請失敗：" + (data.error || "unknown error"));
-        return;
-      }
-
-      setSubmittedClaimByCredId((prev) => ({
-        ...prev,
-        [credId]: data.claim,
-      }));
-    } catch (err) {
-      console.error(err);
-      alert("❌ 呼叫 /api/claim/submit 失敗：" + err.message);
-    } finally {
-      setSubmittingId(null);
-      setSelectingPreviewForId(null);
-    }
-  };
-
-  // 按「Accept」
-  const handleAccept = async (offerId) => {
-    if (!offerId) return;
-
-    const prevCount = credentials.length;
-    setAcceptingId(offerId);
-
-    try {
-      const res = await fetch(`/api/credentialOffers/${offerId}/accept`, {
-        method: "POST",
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialAttrs: getSelectedAttrsForCred(cred), insuredId: DEMO_INSURED_ID, policyId: DEMO_POLICY_ID }),
       });
       const data = await res.json();
-
-      if (!data.ok) {
-        alert("❌ Failed to accept credential offer: " + data.error);
-        return;
-      }
-
-      let tries = 0;
-      let stored = false;
-
-      while (tries < 8 && !stored) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const checkRes = await fetch("/api/credentials");
-        const checkData = await checkRes.json();
-
-        if (checkData.ok) {
-          const rawList = checkData.credentials || checkData.results || [];
-          const list = decorateCredentials(rawList);
-          if (list.length > prevCount) {
-            setCredentials(list);
-            stored = true;
-          }
-        }
-        tries += 1;
-      }
-
-      await fetchOffers();
-    } catch (err) {
-      console.error(err);
-      alert("❌ Error while accepting offer: " + err.message);
-    } finally {
-      setAcceptingId(null);
-    }
+      if (!data.ok) throw new Error(data.error);
+      setSubmittedClaimByCredId((prev) => ({ ...prev, [cred.id]: data.claim }));
+    } catch (err) { alert("❌ 送出失敗：" + err.message); } finally { setSubmittingId(null); setSelectingPreviewForId(null); }
   };
 
-  useEffect(() => {
-    fetchCredentials();
-    fetchOffers();
-  }, []);
+  useEffect(() => { fetchCredentials(); fetchOffers(); }, []);
 
-  // 先到的在上面（反轉）
-  const sortedCredentials = [...(credentials || [])].reverse();
+  // Filter Logic
+  const filteredCredentials = [...credentials].reverse().filter((cred) => {
+    return activeTab === "hospital" 
+      ? (cred.issuerDid === HOSPITAL_DID || cred.issuerLabel === "Hospital")
+      : (cred.issuerDid === INSURER_DID || cred.issuerLabel === "Insurer");
+  });
 
-  // ⭐ 新增：依 issuer 分兩組
-  const hospitalCreds = sortedCredentials.filter(
-    (c) => c.issuerDid === HOSPITAL_DID || c.issuerLabel === "Hospital"
-  );
-  const insurerCreds = sortedCredentials.filter(
-    (c) => c.issuerDid === INSURER_DID || c.issuerLabel === "Insurer"
-  );
+  // --- STYLES (Aligned with Screenshots) ---
 
-  // 樣式
-  const sectionTitleStyle = {
-    color: "#003366",
-    borderLeft: "4px solid #4c8dff",
-    paddingLeft: "10px",
-    marginBottom: "12px",
-    fontWeight: 650,
-    fontSize: "22px",
-  };
+  const styles = {
+    // 獨立的藍色直條
+    blueBar: {
+      width: "5px",
+      height: "28px", // 稍微加高以配合文字
+      backgroundColor: "#3b82f6", // Royal blue
+      marginRight: "14px",
+      borderRadius: "2px",
+    },
+    
+    // 標題容器：左右撐開 (space-between)
+    headerRow: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between", // 讓左邊的標題和右邊的 Tab 分開
+      marginBottom: "20px",
+      height: "40px",
+    },
 
-  const subSectionTitleStyle = {
-    fontSize: "18px",
-    fontWeight: 600,
-    color: "#1e3a8a",
-    marginTop: "4px",
-    marginBottom: "8px",
-  };
+    // 標題左側組合 (藍條 + 文字)
+    titleGroup: {
+      display: "flex",
+      alignItems: "center",
+    },
 
-  const cardStyle = {
-    backgroundColor: "#ffffff",
-    borderRadius: "10px",
-    padding: "16px 20px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
-    border: "1px solid #e3ebff",
-  };
+    // 標題文字
+    sectionTitleText: {
+      color: "#0f172a", // Dark slate
+      fontWeight: "700",
+      fontSize: "24px",
+      margin: 0,
+      lineHeight: 1, // 確保垂直置中更好對齊
+    },
 
-  const labelStyle = {
-    fontWeight: 600,
-    color: "#334155",
-    marginRight: 6,
-  };
+    // Tab 切換器容器 (靠右)
+    tabContainer: {
+      backgroundColor: "#f8fafc",
+      padding: "4px",
+      borderRadius: "999px",
+      display: "flex",
+      gap: "4px",
+    },
 
-  const smallBadge = {
-    display: "inline-block",
-    padding: "2px 8px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    backgroundColor: "#e0e7ff",
-    color: "#1e3a8a",
-    marginLeft: "8px",
+    // 卡片基礎
+    cardBase: {
+      backgroundColor: "#ffffff",
+      border: "1px solid #eef2ff",
+      borderRadius: "12px",
+      padding: "24px 28px",
+      marginBottom: "16px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+    },
+
+    // 整排按鈕容器
+    btnRow: {
+      display: "flex",
+      alignItems: "center",
+      marginTop: "24px",
+    },
+
+    leftActions: {
+      display: "flex",
+      gap: "12px",
+    },
+
+    // 右側按鈕群組（試算 / 送出 / Delete）
+    actionGroupRight: {
+      display: "flex",
+      gap: "12px",
+      marginLeft: "auto", // 把整組推到最右邊
+    },
+
+    // 三個按鈕共用：同寬同高
+    actionBtn: {
+      padding: "8px 20px",
+      borderRadius: "999px",
+      fontSize: "14px",
+      fontWeight: 600,
+      cursor: "pointer",
+      border: "none",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "opacity 0.2s, transform 0.15s",
+    },
+    
+    // 資訊行
+    infoRow: {
+      marginBottom: "10px",
+      fontSize: "15px",
+      lineHeight: "1.6",
+      color: "#1e293b",
+      display: "flex",
+      alignItems: "center",
+    },
+    
+    label: {
+      fontWeight: "700",
+      color: "#334155",
+      marginRight: "8px",
+    },
+    
+    valueMono: {
+      fontFamily: "'Roboto Mono', 'Menlo', monospace",
+      fontSize: "14px",
+      color: "#0f172a",
+      letterSpacing: "0.5px",
+    },
+
+    valueText: {
+      fontSize: "15px",
+      color: "#0f172a",
+      fontWeight: "500",
+    },
+
+    // Verified Badge
+    badge: {
+      backgroundColor: "#e0e7ff", 
+      color: "#4338ca", 
+      fontSize: "12px",
+      fontWeight: "600",
+      padding: "2px 10px",
+      borderRadius: "999px",
+      marginLeft: "12px",
+      display: "inline-block",
+    },
+
+    // 按鈕群組
+    btnGroup: {
+      display: "flex",
+      alignItems: "center",
+      marginTop: "24px",
+      gap: "12px",
+    },
+
+    // 圓角按鈕
+    btnPill: {
+      borderRadius: "999px",
+      padding: "8px 20px",
+      fontSize: "14px",
+      fontWeight: "600",
+      cursor: "pointer",
+      border: "none",
+      transition: "opacity 0.2s",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    // 按鈕顏色
+    btnWhite: {
+      backgroundColor: "#ffffff",
+      border: "1px solid #cbd5e1",
+      color: "#0f172a",
+    },
+    btnGreen: {
+      backgroundColor: "#5fdba7",
+      color: "#064e3b",
+      border: "none",
+    },
+    btnYellow: {
+      backgroundColor: "#eab308",
+      color: "#422006",
+      border: "none",
+    },
+    btnRed: {
+      backgroundColor: "#dc2626",
+      color: "#ffffff",
+      border: "none",
+      marginLeft: "auto", // 將刪除按鈕推到最右邊
+    },
+    
+    // Tab Button 樣式
+    tabBtn: (isActive) => ({
+      padding: "8px 24px",
+      cursor: "pointer",
+      fontSize: "15px",
+      fontWeight: 600,
+      borderRadius: "999px",
+      border: "none",
+      backgroundColor: isActive ? "#3b82f6" : "transparent",
+      color: isActive ? "#ffffff" : "#64748b",
+      transition: "all 0.2s",
+      outline: "none",
+    }),
+
+    // Pending Offer 容器
+    pendingContainer: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
   };
 
   return (
-    <div
-      style={{
-        padding: "24px 16px",
-        maxWidth: "980px",
-        margin: "0 auto 40px",
-      }}
-    >
-      {/* Pending Offers 區塊 */}
-      <section style={{ marginBottom: "40px" }}>
-        <h2 style={sectionTitleStyle}>Pending Credential Offers</h2>
+    <div style={{ padding: "40px 24px", maxWidth: "960px", margin: "0 auto", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
+      
+      {/* 1. Pending Offers */}
+      <section style={{ marginBottom: "50px" }}>
+        {/* Header with Blue Bar - Align Left */}
+        <div style={styles.headerRow}>
+          <div style={styles.titleGroup}>
+            <div style={styles.blueBar}></div>
+            <h2 style={styles.sectionTitleText}>Pending Credential Offers</h2>
+          </div>
+          {/* Right side is empty for this section */}
+          <div></div>
+        </div>
 
-        {loadingOffers ? (
-          <p>Loading offers...</p>
-        ) : offers.length === 0 ? (
-          <p style={{ color: "#64748b" }}>No pending credential offers.</p>
+        {loadingOffers ? <p>Loading...</p> : offers.length === 0 ? (
+          <p style={{ color: "#94a3b8", marginLeft: "20px" }}>No offers pending.</p>
         ) : (
-          <div style={{ display: "grid", gap: "14px" }}>
+          <div>
             {offers.map((offer) => {
-              const credExId =
-                offer.credential_exchange_id || offer.id || offer._id;
-              const schemaId = offer.schema_id || offer.schemaId || "";
-              const credDefId =
-                offer.credential_definition_id ||
-                offer.cred_def_id ||
-                offer.credential_definition_id;
-
-              const issuerDid = (credDefId || "").split(":")[0] || "";
-              const issuerLabel =
-                offer.issuerLabel ||
-                DID_LABELS[issuerDid] ||
-                issuerDid ||
-                "Unknown Issuer";
-
-              let schemaShort = schemaId;
-              const parts = schemaId.split(":");
-              if (parts.length >= 4) {
-                schemaShort = `${parts[2]} v${parts[3]}`;
-              }
+              const credExId = offer.credential_exchange_id || offer.id;
+              const schemaId = offer.schema_id || "";
+              const schemaParts = schemaId.split(':');
+              const schemaName = schemaParts.length > 2 ? `${schemaParts[2]} v${schemaParts[3]}` : schemaId;
+              const issuerLabel = offer.issuerLabel || "Hospital";
 
               return (
-                <div key={credExId} style={cardStyle}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "12px",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "15px", marginBottom: "4px" }}>
-                        <span style={labelStyle}>Schema:</span>
-                        <span>{schemaShort}</span>
+                <div key={credExId} style={styles.cardBase}>
+                  <div style={styles.pendingContainer}>
+                    {/* 左側資訊 */}
+                    <div>
+                      <div style={styles.infoRow}>
+                        <span style={styles.label}>Schema:</span>
+                        <span style={styles.valueText}>{schemaName}</span>
                       </div>
-                      <div style={{ fontSize: "14px", color: "#475569" }}>
-                        <span style={labelStyle}>Issuer:</span>
-                        <span>{issuerLabel}</span>
+                      <div style={styles.infoRow}>
+                        <span style={styles.label}>Issuer:</span>
+                        <span style={styles.valueText}>{issuerLabel}</span>
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#94a3b8", fontFamily: "monospace", marginTop: "4px" }}>
+                        ID: {credExId}
                       </div>
                     </div>
 
+                    {/* 右側按鈕 */}
                     <button
                       onClick={() => handleAccept(credExId)}
                       disabled={acceptingId === credExId}
                       style={{
-                        padding: "8px 16px",
-                        borderRadius: "999px",
-                        border: "none",
-                        fontWeight: 600,
-                        fontSize: "14px",
-                        cursor: "pointer",
-                        background:
-                          acceptingId === credExId ? "#cbd5f5" : "#2563eb",
-                        color: "white",
-                        boxShadow: "0 2px 6px rgba(37, 99, 235, 0.35)",
+                          ...styles.btnPill,
+                          backgroundColor: acceptingId === credExId ? "#93c5fd" : "#2563eb",
+                          color: "white",
+                          boxShadow: "0 4px 10px rgba(37, 99, 235, 0.2)"
                       }}
                     >
                       {acceptingId === credExId ? "Accepting..." : "Accept"}
                     </button>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: "6px",
-                      fontSize: "12px",
-                      color: "#94a3b8",
-                    }}
-                  >
-                    ID: {credExId}
                   </div>
                 </div>
               );
@@ -471,689 +428,482 @@ export default function CredentialsPage() {
         )}
       </section>
 
-      {/* My Credentials 區塊 */}
+      {/* 2. My Credentials (Tabbed) */}
       <section>
-        <h2 style={sectionTitleStyle}>My Credentials</h2>
+        {/* Header with Blue Bar (Left) and Tabs (Right) */}
+        <div style={styles.headerRow}>
+          <div style={styles.titleGroup}>
+            <div style={styles.blueBar}></div>
+            <h2 style={styles.sectionTitleText}>My Credentials</h2>
+          </div>
+          
+          {/* Tabs positioned to the right */}
+          <div style={styles.tabContainer}>
+            <button onClick={() => setActiveTab("hospital")} style={styles.tabBtn(activeTab === "hospital")}>
+              From Hospital
+            </button>
+            <button onClick={() => setActiveTab("insurer")} style={styles.tabBtn(activeTab === "insurer")}>
+              From Insurer
+            </button>
+          </div>
+        </div>
 
-        {loadingCreds ? (
-          <p>Loading credentials...</p>
-        ) : sortedCredentials.length === 0 ? (
-          <p style={{ color: "#64748b" }}>No credentials found.</p>
+        {loadingCreds ? <p>Loading credentials...</p> : filteredCredentials.length === 0 ? (
+           <div style={{...styles.cardBase, textAlign: "center", border: "2px dashed #cbd5e1", boxShadow: "none"}}>
+             <p style={{color: "#94a3b8"}}>No credentials found in this category.</p>
+           </div>
         ) : (
-          <>
-            {/* ⭐ Hospital 的憑證：有理賠試算／送出理賠 */}
-            {hospitalCreds.length > 0 && (
-              <>
-                <h3 style={subSectionTitleStyle}>From Hospital</h3>
-                <div
-                  style={{
-                    display: "grid",
-                    gap: "16px",
-                    marginBottom: "24px",
-                  }}
-                >
-                  {hospitalCreds.map((cred) => (
-                    <div key={cred.id} style={cardStyle}>
-                      <p style={{ marginBottom: "6px", fontSize: "15px" }}>
-                        <span style={labelStyle}>Credential ID:</span>
-                        <span
-                          style={{
-                            fontFamily: "monospace",
-                            fontSize: "13px",
-                            wordBreak: "break-all",
-                          }}
-                        >
-                          {cred.id}
-                        </span>
-                      </p>
+          <div>
+            {filteredCredentials.map((cred) => (
+              <div key={cred.id} style={styles.cardBase}>
+                
+                {/* 資訊區域 */}
+                <div style={styles.infoRow}>
+                  <span style={styles.label}>Credential ID:</span>
+                  <span style={styles.valueMono}>{cred.id}</span>
+                </div>
+                
+                <div style={styles.infoRow}>
+                  <span style={styles.label}>Schema:</span>
+                  <span style={styles.valueText}>{cred.schemaId}</span>
+                </div>
 
-                      <p style={{ marginBottom: "4px", fontSize: "14px" }}>
-                        <span style={labelStyle}>Schema:</span>
-                        <span>{cred.schemaId}</span>
-                      </p>
+                <div style={styles.infoRow}>
+                  <span style={styles.label}>Issuer:</span>
+                  <span style={styles.valueText}>{cred.issuerLabel || "Unknown"}</span>
+                  {cred.issuerLabel && <span style={styles.badge}>verified</span>}
+                </div>
 
-                      <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-                        <span style={labelStyle}>Issuer:</span>
-                        <span>
-                          {cred.issuerLabel || cred.issuerDid || "Unknown"}
-                        </span>
-                        {cred.issuerLabel && (
-                          <span style={smallBadge}>verified</span>
-                        )}
-                      </p>
+                {/* 按鈕區域 (前三個靠左，Delete 靠右) */}
+                <div style={styles.btnRow}>
+                  {/* 左邊：Show + 試算 + 送出 */}
+                  <div style={styles.leftActions}>
+                    {/* Show attributes */}
+                    <button
+                      onClick={() => {
+                        setExpandedId(expandedId === cred.id ? null : cred.id);
+                        if (expandedId !== cred.id) setSelectingPreviewForId(null);
+                      }}
+                      style={styles.btnPill}
+                    >
+                      {expandedId === cred.id ? "Hide attributes" : "Show attributes"}
+                    </button>
 
-                      <div
+                  {/* Hospital Only Buttons */}
+                  {activeTab === "hospital" && (
+                    <>
+                      {/* 試算理賠 */}
+                      <button
+                        onClick={() => openPreviewSelector(cred)}
+                        disabled={previewingId === cred.id}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginTop: "8px",
+                          ...styles.actionBtn,
+                          backgroundColor: previewingId === cred.id ? "#bbf7d0" : "#22c55e",
+                          color: "#064e3b",
                         }}
                       >
-                        {/* Show attributes */}
+                         {previewingId === cred.id ? "計算中..." : "試算理賠"}
+                      </button>
+
+                      {/* 送出正式理賠申請 */}
+                      <button
+                        onClick={() => handleSubmitClaim(cred)}
+                        disabled={submittingId === cred.id}
+                        style={{
+                          ...styles.actionBtn,
+                          backgroundColor: submittingId === cred.id ? "#ca8a04" : "#eab308",
+                          color: "#422006",
+                        }}
+                      >
+                         {submittingId === cred.id ? "送出中..." : "送出理賠申請"}
+                      </button>
+                    </>
+                  )}
+                  </div>
+                  
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => handleDeleteCredential(cred.id)}
+                    disabled={deletingId === cred.id}
+                    style={{
+                      ...styles.actionBtn,
+                      marginLeft: "auto",          // 把 Delete 推到最右邊
+                      backgroundColor: "#e11d48",
+                      color: "white",
+                      opacity: deletingId === cred.id ? 0.7 : 1,
+                      cursor: deletingId === cred.id ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {deletingId === cred.id ? "..." : "Delete"}
+                  </button>
+                </div>
+
+                {/* --- 展開內容區域 (Attributes / Claim) --- */}
+                
+                {/* 屬性展示 */}
+                {expandedId === cred.id && cred.attrs && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      borderRadius: "12px",
+                      background: "#f9fafb",
+                      border: "1px solid #e2e8f0",
+                      padding: "14px 16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        marginBottom: "8px",
+                        color: "#0f172a",
+                      }}
+                    >
+                      Attributes
+                    </div>
+
+                    <dl
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "minmax(0, 160px) minmax(0, 1fr)",
+                        rowGap: "6px",
+                        columnGap: "16px",
+                        margin: 0,
+                      }}
+                    >
+                      {Object.entries(cred.attrs).map(([key, value]) => (
+                        <div key={key} style={{ display: "contents" }}>
+                          <dt
+                            style={{
+                              justifySelf: "end",
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              color: "#64748b",
+                              textTransform: "none",
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 10px",
+                                borderRadius: "999px",
+                                background: "#e5edff",
+                              }}
+                            >
+                              {key}
+                            </span>
+                          </dt>
+                          <dd
+                            style={{
+                              margin: 0,
+                              fontSize: "13px",
+                              color: "#0f172a",
+                              wordBreak: "break-word",
+                              paddingTop: "4px",
+                            }}
+                          >
+                            {value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
+                
+                {/* 試算選擇 */}
+                {activeTab === "hospital" && selectingPreviewForId === cred.id && (
+                   <div
+                    style={{
+                      marginTop: "12px",
+                      borderRadius: "12px",
+                      background: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: "#1d4ed8",
+                        }}
+                      >
+                        選擇要揭露給保險公司的欄位
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
                         <button
+                          type="button"
                           onClick={() => {
-                            if (expandedId === cred.id) {
-                              setExpandedId(null);
-                            } else {
-                              setExpandedId(cred.id);
-                              if (selectingPreviewForId === cred.id) {
-                                setSelectingPreviewForId(null);
-                              }
-                            }
+                            setSelectedAttrsByCredId((prev) => {
+                              const next = { ...prev };
+                              delete next[cred.id];
+                              return next;
+                            });
                           }}
                           style={{
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "1px solid #cbd5f5",
-                            backgroundColor: "#f8fafc",
-                            fontSize: "13px",
+                            border: "none",
+                            background: "transparent",
+                            fontSize: "11px",
+                            color: "#2563eb",
                             cursor: "pointer",
                           }}
                         >
-                          {expandedId === cred.id
-                            ? "Hide attributes"
-                            : "Show attributes"}
+                          全選
                         </button>
-
-                        {/* 試算理賠 */}
                         <button
-                          onClick={() => openPreviewSelector(cred)}
-                          disabled={previewingId === cred.id}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "1px solid #bbf7d0",
-                            backgroundColor:
-                              previewingId === cred.id
-                                ? "#dcfce7"
-                                : "#22c55e",
-                            color: "#064e3b",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            marginLeft: "15px",
-                            cursor:
-                              previewingId === cred.id ? "wait" : "pointer",
+                          type="button"
+                          onClick={() => {
+                            setSelectedAttrsByCredId((prev) => ({
+                              ...prev,
+                              [cred.id]: new Set(),
+                            }));
                           }}
-                        >
-                          {previewingId === cred.id ? "計算中..." : "試算理賠"}
-                        </button>
-
-                        {/* 送出正式理賠申請 */}
-                        <button
-                          onClick={() => handleSubmitClaim(cred)}
-                          disabled={submittingId === cred.id}
                           style={{
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "1px solid #facc15",
-                            backgroundColor:
-                              submittingId === cred.id ? "#fef9c3" : "#eab308",
-                            color: "#422006",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            marginLeft: "15px",
-                            cursor:
-                              submittingId === cred.id ? "wait" : "pointer",
-                          }}
-                        >
-                          {submittingId === cred.id
-                            ? "送出中..."
-                            : "送出理賠申請"}
-                        </button>
-
-                        <div style={{ flex: 1 }} />
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => handleDeleteCredential(cred.id)}
-                          disabled={deletingId === cred.id}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "999px",
                             border: "none",
-                            backgroundColor: "#e11d48",
-                            color: "white",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor:
-                              deletingId === cred.id
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity: deletingId === cred.id ? 0.7 : 1,
+                            background: "transparent",
+                            fontSize: "11px",
+                            color: "#64748b",
+                            cursor: "pointer",
                           }}
                         >
-                          {deletingId === cred.id ? "Deleting..." : "Delete"}
+                          全部取消
                         </button>
                       </div>
+                    </div>
 
-                      {/* Attributes */}
-                      {expandedId === cred.id && cred.attrs && (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            borderRadius: "12px",
-                            background: "#f9fafb",
-                            border: "1px solid #e2e8f0",
-                            padding: "14px 16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: 600,
-                              marginBottom: "8px",
-                              color: "#0f172a",
-                            }}
-                          >
-                            Attributes
-                          </div>
+                    <div
+                      style={{
+                        maxHeight: "180px",
+                        overflowY: "auto",
+                        paddingRight: "4px",
+                        marginBottom: "10px",
+                      }}
+                    >
+                      {Object.entries(getRawAttrsForCred(cred)).map(
+                        ([key, value]) => {
+                          const selectedSet =
+                            selectedAttrsByCredId[cred.id];
+                          const checked = selectedSet
+                            ? selectedSet.has(key)
+                            : true;
 
-                          <dl
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "minmax(0, 160px) minmax(0, 1fr)",
-                              rowGap: "6px",
-                              columnGap: "16px",
-                              margin: 0,
-                            }}
-                          >
-                            {Object.entries(cred.attrs).map(([key, value]) => (
-                              <div key={key} style={{ display: "contents" }}>
-                                <dt
-                                  style={{
-                                    justifySelf: "end",
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    color: "#64748b",
-                                    textTransform: "none",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      display: "inline-block",
-                                      padding: "2px 10px",
-                                      borderRadius: "999px",
-                                      background: "#e5edff",
-                                    }}
-                                  >
-                                    {key}
-                                  </span>
-                                </dt>
-                                <dd
-                                  style={{
-                                    margin: 0,
-                                    fontSize: "13px",
-                                    color: "#0f172a",
-                                    wordBreak: "break-word",
-                                    paddingTop: "4px",
-                                  }}
-                                >
-                                  {value}
-                                </dd>
-                              </div>
-                            ))}
-                          </dl>
-                        </div>
-                      )}
-
-                      {/* 理賠試算欄位選擇 */}
-                      {selectingPreviewForId === cred.id && (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            borderRadius: "12px",
-                            background: "#eff6ff",
-                            border: "1px solid #bfdbfe",
-                            padding: "12px 14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              marginBottom: "8px",
-                            }}
-                          >
-                            <div
+                          return (
+                            <label
+                              key={key}
                               style={{
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                color: "#1d4ed8",
-                              }}
-                            >
-                              選擇要揭露給保險公司的欄位
-                            </div>
-                            <div style={{ display: "flex", gap: "8px" }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedAttrsByCredId((prev) => {
-                                    const next = { ...prev };
-                                    delete next[cred.id];
-                                    return next;
-                                  });
-                                }}
-                                style={{
-                                  border: "none",
-                                  background: "transparent",
-                                  fontSize: "11px",
-                                  color: "#2563eb",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                全選
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedAttrsByCredId((prev) => ({
-                                    ...prev,
-                                    [cred.id]: new Set(),
-                                  }));
-                                }}
-                                style={{
-                                  border: "none",
-                                  background: "transparent",
-                                  fontSize: "11px",
-                                  color: "#64748b",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                全部取消
-                              </button>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              maxHeight: "180px",
-                              overflowY: "auto",
-                              paddingRight: "4px",
-                              marginBottom: "10px",
-                            }}
-                          >
-                            {Object.entries(getRawAttrsForCred(cred)).map(
-                              ([key, value]) => {
-                                const selectedSet =
-                                  selectedAttrsByCredId[cred.id];
-                                const checked = selectedSet
-                                  ? selectedSet.has(key)
-                                  : true;
-
-                                return (
-                                  <label
-                                    key={key}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "8px",
-                                      fontSize: "12px",
-                                      marginBottom: "4px",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) => {
-                                        const isChecked = e.target.checked;
-                                        setSelectedAttrsByCredId((prev) => {
-                                          let current = prev[cred.id];
-
-                                          if (!current) {
-                                            current = new Set(
-                                              Object.keys(
-                                                getRawAttrsForCred(cred) || {}
-                                              )
-                                            );
-                                          } else {
-                                            current = new Set(current);
-                                          }
-
-                                          if (isChecked) {
-                                            current.add(key);
-                                          } else {
-                                            current.delete(key);
-                                          }
-
-                                          return {
-                                            ...prev,
-                                            [cred.id]: current,
-                                          };
-                                        });
-                                      }}
-                                    />
-                                    <span
-                                      style={{
-                                        display: "inline-block",
-                                        padding: "2px 8px",
-                                        borderRadius: "999px",
-                                        backgroundColor: checked
-                                          ? "#dbeafe"
-                                          : "#e5e7eb",
-                                        color: "#1f2937",
-                                        minWidth: "120px",
-                                        textAlign: "right",
-                                      }}
-                                    >
-                                      {key}
-                                    </span>
-                                    <span
-                                      style={{
-                                        flex: 1,
-                                        color: "#0f172a",
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {value}
-                                    </span>
-                                  </label>
-                                );
-                              }
-                            )}
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "flex-end",
-                              gap: "8px",
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setSelectingPreviewForId(null)}
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: "999px",
-                                border: "1px solid #cbd5f5",
-                                backgroundColor: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
                                 fontSize: "12px",
+                                marginBottom: "4px",
                                 cursor: "pointer",
                               }}
                             >
-                              取消
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handlePreviewClaim(cred)}
-                              disabled={previewingId === cred.id}
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: "999px",
-                                border: "none",
-                                backgroundColor:
-                                  previewingId === cred.id
-                                    ? "#bfdbfe"
-                                    : "#2563eb",
-                                color: "white",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                cursor:
-                                  previewingId === cred.id
-                                    ? "wait"
-                                    : "pointer",
-                              }}
-                            >
-                              {previewingId === cred.id ? "計算中..." : "確定試算"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setSelectedAttrsByCredId((prev) => {
+                                    let current = prev[cred.id];
 
-                      {/* 預估理賠結果 */}
-                      {claimPreviewByCredId[cred.id] && (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            borderRadius: "12px",
-                            background: "#f0fdf4",
-                            border: "1px solid #bbf7d0",
-                            padding: "14px 16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: 600,
-                              marginBottom: "8px",
-                              color: "#166534",
-                            }}
-                          >
-                            預估理賠結果
-                          </div>
-                          <p
-                            style={{
-                              margin: 0,
-                              fontSize: "13px",
-                              color: "#14532d",
-                            }}
-                          >
-                            可否理賠：
-                            {claimPreviewByCredId[cred.id].eligible
-                              ? "可以"
-                              : "不可以"}
-                          </p>
-                          <p
-                            style={{
-                              margin: "4px 0 8px",
-                              fontSize: "13px",
-                              color: "#14532d",
-                            }}
-                          >
-                            預估金額：
-                            {claimPreviewByCredId[cred.id].totalPayout} 元
-                          </p>
-                          <ul
-                            style={{
-                              margin: 0,
-                              paddingLeft: "18px",
-                              fontSize: "12px",
-                              color: "#166534",
-                            }}
-                          >
-                            {claimPreviewByCredId[cred.id].breakdown.map(
-                              (r, idx) => (
-                                <li key={idx}>{r}</li>
-                              )
-                            )}
-                          </ul>
-                        </div>
-                      )}
+                                    if (!current) {
+                                      current = new Set(
+                                        Object.keys(
+                                          getRawAttrsForCred(cred) || {}
+                                        )
+                                      );
+                                    } else {
+                                      current = new Set(current);
+                                    }
 
-                      {submittedClaimByCredId[cred.id] && (
-                        <div
-                          style={{
-                            marginTop: "10px",
-                            padding: "10px 12px",
-                            borderRadius: "10px",
-                            border: "1px solid #fee2e2",
-                            backgroundColor: "#fef2f2",
-                            fontSize: "12px",
-                            color: "#7f1d1d",
-                          }}
-                        >
-                          <div style={{ fontWeight: 600, marginBottom: "4px" }}>
-                            已送出理賠申請
-                          </div>
-                          <div>
-                            Claim ID：
-                            {submittedClaimByCredId[cred.id].claimId}（狀態：
-                            {submittedClaimByCredId[cred.id].status}）
-                          </div>
-                        </div>
+                                    if (isChecked) {
+                                      current.add(key);
+                                    } else {
+                                      current.delete(key);
+                                    }
+
+                                    return {
+                                      ...prev,
+                                      [cred.id]: current,
+                                    };
+                                  });
+                                }}
+                              />
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 8px",
+                                  borderRadius: "999px",
+                                  backgroundColor: checked
+                                    ? "#dbeafe"
+                                    : "#e5e7eb",
+                                  color: "#1f2937",
+                                  minWidth: "120px",
+                                  textAlign: "right",
+                                }}
+                              >
+                                {key}
+                              </span>
+                              <span
+                                style={{
+                                  flex: 1,
+                                  color: "#0f172a",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {value}
+                              </span>
+                            </label>
+                          );
+                        }
                       )}
                     </div>
-                  ))}
-                </div>
-              </>
-            )}
 
-            {/* ⭐ Insurer 的憑證：只保留 Show attributes（＋ Delete） */}
-            {insurerCreds.length > 0 && (
-              <>
-                <h3 style={subSectionTitleStyle}>From Insurer</h3>
-                <div style={{ display: "grid", gap: "16px" }}>
-                  {insurerCreds.map((cred) => (
-                    <div key={cred.id} style={cardStyle}>
-                      <p style={{ marginBottom: "6px", fontSize: "15px" }}>
-                        <span style={labelStyle}>Credential ID:</span>
-                        <span
-                          style={{
-                            fontFamily: "monospace",
-                            fontSize: "13px",
-                            wordBreak: "break-all",
-                          }}
-                        >
-                          {cred.id}
-                        </span>
-                      </p>
-
-                      <p style={{ marginBottom: "4px", fontSize: "14px" }}>
-                        <span style={labelStyle}>Schema:</span>
-                        <span>{cred.schemaId}</span>
-                      </p>
-
-                      <p style={{ marginBottom: "8px", fontSize: "14px" }}>
-                        <span style={labelStyle}>Issuer:</span>
-                        <span>
-                          {cred.issuerLabel || cred.issuerDid || "Unknown"}
-                        </span>
-                        {cred.issuerLabel && (
-                          <span style={smallBadge}>verified</span>
-                        )}
-                      </p>
-
-                      <div
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: "8px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectingPreviewForId(null)}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginTop: "8px",
+                          padding: "6px 12px",
+                          borderRadius: "999px",
+                          border: "1px solid #cbd5f5",
+                          backgroundColor: "white",
+                          fontSize: "12px",
+                          cursor: "pointer",
                         }}
                       >
-                        {/* 只有 Show attributes */}
-                        <button
-                          onClick={() => {
-                            setExpandedId(
-                              expandedId === cred.id ? null : cred.id
-                            );
-                          }}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "1px solid #cbd5f5",
-                            backgroundColor: "#f8fafc",
-                            fontSize: "13px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {expandedId === cred.id
-                            ? "Hide attributes"
-                            : "Show attributes"}
-                        </button>
-
-                        <div style={{ flex: 1 }} />
-
-                        {/* Delete 一樣保留（如果不想要也可以之後拿掉） */}
-                        <button
-                          onClick={() => handleDeleteCredential(cred.id)}
-                          disabled={deletingId === cred.id}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "999px",
-                            border: "none",
-                            backgroundColor: "#e11d48",
-                            color: "white",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor:
-                              deletingId === cred.id
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity: deletingId === cred.id ? 0.7 : 1,
-                          }}
-                        >
-                          {deletingId === cred.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-
-                      {expandedId === cred.id && cred.attrs && (
-                        <div
-                          style={{
-                            marginTop: "12px",
-                            borderRadius: "12px",
-                            background: "#f9fafb",
-                            border: "1px solid #e2e8f0",
-                            padding: "14px 16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: 600,
-                              marginBottom: "8px",
-                              color: "#0f172a",
-                            }}
-                          >
-                            Attributes
-                          </div>
-
-                          <dl
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "minmax(0, 160px) minmax(0, 1fr)",
-                              rowGap: "6px",
-                              columnGap: "16px",
-                              margin: 0,
-                            }}
-                          >
-                            {Object.entries(cred.attrs).map(([key, value]) => (
-                              <div key={key} style={{ display: "contents" }}>
-                                <dt
-                                  style={{
-                                    justifySelf: "end",
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    color: "#64748b",
-                                    textTransform: "none",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      display: "inline-block",
-                                      padding: "2px 10px",
-                                      borderRadius: "999px",
-                                      background: "#e5edff",
-                                    }}
-                                  >
-                                    {key}
-                                  </span>
-                                </dt>
-                                <dd
-                                  style={{
-                                    margin: 0,
-                                    fontSize: "13px",
-                                    color: "#0f172a",
-                                    wordBreak: "break-word",
-                                    paddingTop: "4px",
-                                  }}
-                                >
-                                  {value}
-                                </dd>
-                              </div>
-                            ))}
-                          </dl>
-                        </div>
-                      )}
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewClaim(cred)}
+                        disabled={previewingId === cred.id}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "999px",
+                          border: "none",
+                          backgroundColor:
+                            previewingId === cred.id
+                              ? "#bfdbfe"
+                              : "#2563eb",
+                          color: "white",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor:
+                            previewingId === cred.id
+                              ? "wait"
+                              : "pointer",
+                        }}
+                      >
+                        {previewingId === cred.id ? "計算中..." : "確定試算"}
+                      </button>
                     </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
+                  </div>
+                )}
+
+                {/* 試算結果 */}
+                {activeTab === "hospital" && claimPreviewByCredId[cred.id] && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      borderRadius: "12px",
+                      background: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      padding: "14px 16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        marginBottom: "8px",
+                        color: "#166534",
+                      }}
+                    >
+                      預估理賠結果
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: "13px",
+                        color: "#14532d",
+                      }}
+                    >
+                      可否理賠：
+                      {claimPreviewByCredId[cred.id].eligible
+                        ? "可以"
+                        : "不可以"}
+                    </p>
+                    <p
+                      style={{
+                        margin: "4px 0 8px",
+                        fontSize: "13px",
+                        color: "#14532d",
+                      }}
+                    >
+                      預估金額：
+                      {claimPreviewByCredId[cred.id].totalPayout} 元
+                    </p>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: "18px",
+                        fontSize: "12px",
+                        color: "#166534",
+                      }}
+                    >
+                      {claimPreviewByCredId[cred.id].breakdown.map(
+                        (r, idx) => (
+                          <li key={idx}>{r}</li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+
+                {/* 送出結果 */}
+                {activeTab === "hospital" && submittedClaimByCredId[cred.id] && (
+                   <div
+                      style={{
+                        marginTop: "10px",
+                        padding: "10px 12px",
+                        borderRadius: "10px",
+                        border: "1px solid #fee2e2",
+                        backgroundColor: "#fef2f2",
+                        fontSize: "12px",
+                        color: "#7f1d1d",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: "4px" }}>
+                        已送出理賠申請
+                      </div>
+                      <div>
+                        Claim ID：
+                        {submittedClaimByCredId[cred.id].claimId}（狀態：
+                        {submittedClaimByCredId[cred.id].status}）
+                      </div>
+                    </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </section>
     </div>

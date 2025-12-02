@@ -51,6 +51,24 @@ export default function MyClaimsPage() {
     }
   };
 
+  const thBase = {
+    padding: "8px 12px",
+    borderBottom: "1px solid #e2e8f0",
+    fontWeight: 600,
+    fontSize: "13px",
+    color: "#1f2937",
+    backgroundColor: "#eff6ff",
+  };
+
+  const tdBase = {
+    padding: "8px 12px",
+    borderBottom: "1px solid #e2e8f0",
+    fontSize: "13px",
+    color: "#111827",
+    verticalAlign: "middle",
+  };
+
+
   return (
     <div style={{ padding: "24px 16px", maxWidth: "900px", margin: "0 auto" }}>
       <h2
@@ -75,27 +93,28 @@ export default function MyClaimsPage() {
             width: "100%",
             borderCollapse: "collapse",
             fontSize: "13px",
+            tableLayout: "fixed",
           }}
         >
+          {/* 固定每欄寬度 */}
+          <colgroup>
+            <col style={{ width: "20%" }} /> {/* Claim ID */}
+            <col style={{ width: "15%" }} /> {/* 狀態 */}
+            <col style={{ width: "23%" }} /> {/* 醫院 */}
+            <col style={{ width: "25%" }} /> {/* 住院期間 */}
+            <col style={{ width: "23%" }} /> {/* 預估金額 */}
+          </colgroup>
+
           <thead>
-            <tr style={{ backgroundColor: "#eff6ff" }}>
-              <th style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                Claim ID
-              </th>
-              <th style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                狀態
-              </th>
-              <th style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                醫院
-              </th>
-              <th style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                住院期間
-              </th>
-              <th style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                預估金額
-              </th>
+            <tr>
+              <th style={{ ...thBase, textAlign: "center" }}>Claim ID</th>
+              <th style={{ ...thBase, textAlign: "center" }}>狀態</th>
+              <th style={{ ...thBase, textAlign: "center" }}>醫院</th>
+              <th style={{ ...thBase, textAlign: "center" }}>住院期間</th>
+              <th style={{ ...thBase, textAlign: "center" }}>預估金額</th>
             </tr>
           </thead>
+
           <tbody>
             {claims.map((c) => (
               <tr
@@ -109,21 +128,21 @@ export default function MyClaimsPage() {
                       : "transparent",
                 }}
               >
-                <td style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
+                <td
+                  style={{
+                    ...tdBase,
+                    textAlign: "center",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  }}
+                >
                   {c.claimId}
                 </td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                  {c.status}
-                </td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                  {c.hospitalName || "-"}
-                </td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
+                <td style={{ ...tdBase, textAlign: "center" }}>{c.status}</td>
+                <td style={{ ...tdBase, textAlign: "center" }}>{c.hospitalName || "-"}</td>
+                <td style={{ ...tdBase, textAlign: "center" }}>
                   {c.admissionDate || "-"} ~ {c.dischargeDate || "-"}
                 </td>
-                <td style={{ padding: "8px", borderBottom: "1px solid #e2e8f0" }}>
-                  {c.estimatedPayout} 元
-                </td>
+                <td style={{ ...tdBase, textAlign: "center" }}> {c.estimatedPayout} 元</td>
               </tr>
             ))}
           </tbody>
@@ -143,15 +162,9 @@ export default function MyClaimsPage() {
           <h3 style={{ marginTop: 0, fontSize: "15px" }}>
             理賠申請詳細：{selectedClaim.claimId}
           </h3>
-          <p style={{ margin: "4px 0" }}>
-            狀態：{selectedClaim.status}
-          </p>
-          <p style={{ margin: "4px 0" }}>
-            保單：{selectedClaim.policyId}
-          </p>
-          <p style={{ margin: "4px 0" }}>
-            醫院：{selectedClaim.hospitalName}（{selectedClaim.hospitalId}）
-          </p>
+          <p style={{ margin: "4px 0" }}>狀態：{selectedClaim.status}</p>
+          <p style={{ margin: "4px 0" }}>保單：{selectedClaim.policyId}</p>
+          <p style={{ margin: "4px 0" }}>醫院：{selectedClaim.hospitalName}（{selectedClaim.hospitalId}）</p>
           <p style={{ margin: "4px 0" }}>
             住院期間：{selectedClaim.admissionDate} ~{" "}
             {selectedClaim.dischargeDate}
