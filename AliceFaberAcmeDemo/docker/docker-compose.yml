@@ -2,20 +2,21 @@ version: '3'
 
 services:
   # Agents
-  faber-agent:
+  # faber-agent:
+  hospital-agent:
     image: ghcr.io/openwallet-foundation/acapy-agent:py3.12-1.2-lts
     command:
       [
         "start",
-        "--label", "Faber Agent",
+        "--label", "Hospital Agent",
         "--inbound-transport", "http", "0.0.0.0", "8020",
         "--outbound-transport", "http",
         "--admin", "0.0.0.0", "8021",
         "--admin-insecure-mode",
-         "--endpoint", "http://faber-agent:8020",
+        "--endpoint", "http://hospital-agent:8020",
         "--wallet-type", "askar",
-        "--wallet-name", "faber_wallet",
-        "--wallet-key", "faber_secret",
+        "--wallet-name", "hospital_wallet",
+        "--wallet-key", "hospital_secret",
         "--seed", "faber000000000000000000000000001",
         # "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
         "--genesis-url", "http://host.docker.internal:9000/genesis",
@@ -28,7 +29,7 @@ services:
         "--auto-respond-presentation-request"
       ]
     volumes:
-      - faber_wallet_data:/home/aries/.aca-py
+      - hospital_wallet_data:/home/aries/.aca-py
     ports:
       - 8120:8020
       - 8121:8021
@@ -36,20 +37,20 @@ services:
       - aca
     tty: true
 
-  alice-agent:
+  patient-agent:
     image: ghcr.io/openwallet-foundation/acapy-agent:py3.12-1.2-lts
     command:
       [
         "start",
-        "--label", "Alice Agent",
+        "--label", "Patient Agent",
         "--inbound-transport", "http", "0.0.0.0", "8030",
         "--outbound-transport", "http",
         "--admin", "0.0.0.0", "8031",
         "--admin-insecure-mode",
-        "--endpoint", "http://alice-agent:8030",
+        "--endpoint", "http://patient-agent:8030",
         "--wallet-type", "askar",
-        "--wallet-name", "alice_wallet",
-        "--wallet-key", "alice_secret",
+        "--wallet-name", "patient_wallet",
+        "--wallet-key", "patient_secret",
         # "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
         "--genesis-url", "http://host.docker.internal:9000/genesis",
         "--auto-provision",
@@ -59,7 +60,7 @@ services:
         "--auto-store-credential"
       ]
     volumes:
-      - alice_wallet_data:/home/aries/.aca-py
+      - patient_wallet_data:/home/aries/.aca-py
     ports:
       - 8130:8030
       - 8131:8031
@@ -67,17 +68,17 @@ services:
       - aca
     tty: true
 
-  acme-agent:
+  insurer-agent:
     image: ghcr.io/openwallet-foundation/acapy-agent:py3.12-1.2-lts
     command:
       [
         "start",
-        "--label", "Acme Agent",
+        "--label", "Insurer Agent",
         "--inbound-transport", "http", "0.0.0.0", "8040",
         "--outbound-transport", "http",
         "--admin", "0.0.0.0", "8041",
         "--admin-insecure-mode",
-        "--endpoint", "http://acme-agent:8040",
+        "--endpoint", "http://insurer-agent:8040",
         "--wallet-type", "askar",
         "--wallet-name", "acme_wallet",
         "--wallet-key", "acme_secret",
@@ -94,7 +95,7 @@ services:
 
       ]
     volumes:
-      - acme_wallet_data:/home/aries/.aca-py
+      - insurer_wallet_data:/home/aries/.aca-py
     ports:
       - 8140:8040
       - 8141:8041
@@ -103,49 +104,52 @@ services:
     tty: true
 
   # Controllers
-  faber-controller:
+  hospital-controller:
     build:
-      context: /Users/chenyantong/Desktop/(try1)acapy-controllers/AliceFaberAcmeDemo/controllers/faber-controller
+      context: /Users/chenyantong/Desktop/(Name-react)acapy-controllers/AliceFaberAcmeDemo/controllers/hospital-controller
     ports:
-      - 9021:80
+      - 9021:5050
     networks:
       - aca
     depends_on:
-      - faber-agent
+      - hospital-agent
     environment:
       - RUNMODE=dev
-      - FABER_AGENT_HOST=faber-agent
+      - FABER_AGENT_HOST=hospital-agent
 
-  alice-controller:
+  patient-controller:
     build:
-      context: /Users/chenyantong/Desktop/(try1)acapy-controllers/AliceFaberAcmeDemo/controllers/alice-controller/
-      args:
-        - RUNMODE=${RUNMODE}
-        - ALICE_AGENT_HOST=${ALICE_AGENT_HOST}
+      context: /Users/chenyantong/Desktop/(Name-react)acapy-controllers/AliceFaberAcmeDemo/controllers/patient-controller
+      # args:
+      #   - RUNMODE=${RUNMODE}
+      #   - ALICE_AGENT_HOST=${ALICE_AGENT_HOST}
     ports:
-      - 9031:80
+      - 9031:9050
     networks:
       - aca
     depends_on:
-      - alice-agent
-
-  acme-controller:
-    build:
-      context: /Users/chenyantong/Desktop/(try1)acapy-controllers/AliceFaberAcmeDemo/controllers/acme-controller/
-    ports:
-      - 9041:3000
-    networks:
-      - aca
-    depends_on:
-      - acme-agent
+      - patient-agent
     environment:
       - RUNMODE=dev
-      - ACME_AGENT_HOST=acme-agent
+      - FABER_AGENT_HOST=patient-agent
+
+  insurer-controller:
+    build:
+      context: /Users/chenyantong/Desktop/(Name-react)acapy-controllers/AliceFaberAcmeDemo/controllers/insurer-controller
+    ports:
+      - 9041:9050
+    networks:
+      - aca
+    depends_on:
+      - insurer-agent
+    environment:
+      - RUNMODE=dev
+      - ACME_AGENT_HOST=insurer-agent
 
 volumes:
-  faber_wallet_data:
-  alice_wallet_data:
-  acme_wallet_data:
+  hospital_wallet_data:
+  patient_wallet_data:
+  insurer_wallet_data:
 
 networks:
   aca:
