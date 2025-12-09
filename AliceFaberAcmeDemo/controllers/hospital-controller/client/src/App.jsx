@@ -5,6 +5,7 @@ import Connections from "./pages/Connections.jsx";
 import CredentialSchemas from "./pages/CredentialSchemas.jsx";
 import CredentialDefinitions from "./pages/CredentialDefinitions.jsx";
 import Credentials from "./pages/Credentials.jsx";
+import hospitalLogo from "./assets/hospital.png";
 
 export default function App() {
   const location = useLocation();
@@ -61,25 +62,18 @@ export default function App() {
               gap: "18px",
             }}
           >
-            {/* Logo：H 小方塊 */}
-            <div
+            {/* Logo 圖片 */}
+            <img
+              src={hospitalLogo}
+              alt="Hospital Logo"
               style={{
                 width: "52px",
                 height: "52px",
-                background:
-                  "radial-gradient(circle at 30% 30%, #022c22, #075985 55%, #022c22)",
                 borderRadius: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "22px",
-                fontWeight: "700",
-                color: "white",
-                boxShadow: "0 18px 32px rgba(15,23,42,0.45)",
+                objectFit: "cover", // 確保圖片填滿且不變形
+                boxShadow: "0 18px 32px rgba(15,23,42,0.45)", // 保留原本的高質感陰影
               }}
-            >
-              H
-            </div>
+            />
 
             <div>
               <h1
@@ -87,12 +81,12 @@ export default function App() {
                   margin: 0,
                   fontSize: "32px",
                   lineHeight: "1.05",
-                  fontWeight: 750,
+                  fontWeight: 800,
                   color: "#0f172a",
                   letterSpacing: "-0.6px",
                 }}
               >
-                Hospital
+               Hospital
               </h1>
               <p
                 style={{

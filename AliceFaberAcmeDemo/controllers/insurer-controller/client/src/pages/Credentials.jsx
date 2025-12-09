@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 // 針對特定 Schema 名稱，寫死欄位順序
 const SCHEMA_ATTR_ORDER = {
   
-  InsurancePolicyV1: [
+  InsurancePolicyV5: [
     "policy_id",
     "insured_id",
     "insured_name",
@@ -179,7 +179,7 @@ export default function CredentialsPage() {
 
     // 如果未來有別的 schema 不想帶預設，可以在這裡判斷
     const defaults =
-      schemaName === "InsurancePolicyV1" ? INSURER_DEMO_VALUES : {};
+      schemaName === "InsurancePolicyV5" ? INSURER_DEMO_VALUES : {};
 
     updateField(
       "CredentialAttributesObject",

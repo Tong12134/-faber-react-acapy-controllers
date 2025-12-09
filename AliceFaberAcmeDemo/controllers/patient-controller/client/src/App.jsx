@@ -5,6 +5,7 @@ import Connections from "./pages/Connections.jsx";
 import ProofRequests from "./pages/ProofRequests.jsx";
 import Credentials from "./pages/Credentials.jsx";
 import MyClaimsPage from "./pages/MyClaimsPage.jsx";
+import patientLogo from "./assets/patient.png";
 
 export default function App() {
   const location = useLocation();
@@ -61,25 +62,18 @@ export default function App() {
               gap: "18px",
             }}
           >
-            {/* Logo：P 小方塊 */}
-            <div
-              style={{
-                width: "52px",
-                height: "52px",
-                background:
-                  "radial-gradient(circle at 30% 30%, #4c1d95, #1d4ed8 55%, #0f172a)",
-                borderRadius: "16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "22px",
-                fontWeight: "700",
-                color: "white",
-                boxShadow: "0 18px 32px rgba(15,23,42,0.45)",
-              }}
-            >
-              P
-            </div>
+            {/* Logo 圖片 */}
+              <img
+                src={patientLogo}
+                alt="Patient Logo"
+                style={{
+                  width: "52px",
+                  height: "52px",
+                  borderRadius: "16px",
+                  objectFit: "cover", // 確保圖片填滿且不變形
+                  boxShadow: "0 18px 32px rgba(15,23,42,0.45)", // 保留原本的高質感陰影
+                }}
+              />
 
             <div>
               <h1

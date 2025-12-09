@@ -20,8 +20,8 @@ export async function ping() {
 
 /** 確保 insurer 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureInsurerSchemaAndCredDef() {
-  const SCHEMA_NAME = "InsurancePolicyV1";
-  const SCHEMA_VERSION = "1.0.0";
+  const SCHEMA_NAME = "InsurancePolicyV5";
+  const SCHEMA_VERSION = "1.0.3";
   
   const ATTRIBUTES = [
     "policy_id",           // 保單號
@@ -37,32 +37,46 @@ export async function ensureInsurerSchemaAndCredDef() {
   
   ];
   
-  const TAG = "insurer-policy-v1"; 
+  const TAG = "insurer-policy-v5"; 
 
-  // 1) 先找 schema
-  const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
-  let schemaId = (createdSchemas.data.schema_ids || []).find((id) =>
-    id.includes(`:${SCHEMA_NAME}:${SCHEMA_VERSION}`)
-  );
-
-  if (!schemaId) {
-    const res = await axios.post(
-      `${AGENT_BASE}/schemas`,
-      {
-        schema_name: SCHEMA_NAME,
-        schema_version: SCHEMA_VERSION,
-        attributes: ATTRIBUTES,
-      },
-      { headers: { "Content-Type": "application/json" } }
-    );
-    schemaId = res.data.schema_id;
-    console.log("[IC] [INIT] created schema:", schemaId);
-  } else {
-    console.log("[IC] [INIT] schema already exists:", schemaId);
-  }
-
-  // 2) 找 cred def
   try {
+    // 1) 先找 schema（只找 wallet 已知的）
+    const createdSchemas = await axios.get(`${AGENT_BASE}/schemas/created`);
+    let schemaId = (createdSchemas.data.schema_ids || []).find((id) =>
+      id.includes(`:${SCHEMA_NAME}:${SCHEMA_VERSION}`)
+    );
+
+
+    if (!schemaId) {
+      try {
+        const res = await axios.post(
+          `${AGENT_BASE}/schemas`,
+          {
+            schema_name: SCHEMA_NAME,
+            schema_version: SCHEMA_VERSION,
+            attributes: ATTRIBUTES,
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        schemaId = res.data.schema_id;
+        console.log("[INS] [INIT] created schema:", schemaId);
+      } catch (err) {
+        console.error(
+          "[INS] /schemas error:",
+          err.response?.status,
+          err.response?.data || err.message
+        );
+        const detail =
+          typeof err.response?.data === "string"
+            ? err.response.data
+            : JSON.stringify(err.response?.data || { error: err.message });
+        throw new Error(detail);
+      }
+    } else {
+      console.log("[INS] [INIT] schema already exists:", schemaId);
+    }
+
+    // 2) 再找 cred def（只從 wallet 找）
     const createdDefs = await axios.get(
       `${AGENT_BASE}/credential-definitions/created`
     );
@@ -71,30 +85,42 @@ export async function ensureInsurerSchemaAndCredDef() {
     );
 
     if (!credDefId) {
-      const res = await axios.post(
-        `${AGENT_BASE}/credential-definitions`,
-        {
-          schema_id: schemaId,
-          tag: TAG,
-          support_revocation: false,
-        },
-        { headers: { "Content-Type": "application/json" } }
-      );
-      credDefId = res.data.credential_definition_id;
-      console.log("IC] [INIT] created cred def:", credDefId);
+      try {
+        const res = await axios.post(
+          `${AGENT_BASE}/credential-definitions`,
+          {
+            schema_id: schemaId,
+            tag: TAG,
+            support_revocation: false,
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        credDefId = res.data.credential_definition_id;
+        console.log("[INS] [INIT] created cred def:", credDefId);
+      } catch (err) {
+        console.error(
+          "[INS] /credential-definitions error:",
+          err.response?.status,
+          err.response?.data || err.message
+        );
+        const detail =
+          typeof err.response?.data === "string"
+            ? err.response.data
+            : JSON.stringify(err.response?.data || { error: err.message });
+        throw new Error(detail);
+      }
     } else {
-      console.log("[IC] [INIT] cred def already exists:", credDefId);
+      console.log("[INS] [INIT] cred def already exists:", credDefId);
     }
 
     return { schemaId, credDefId };
   } catch (err) {
-    console.error(
-      "[IC] [INIT] cred def error:",
-      err.response?.status,
-      err.response?.data || err.message
-    );
+    console.error("============ INSURER INIT ERROR DEBUG ============");
+    console.error("[INS] Status:", err.response?.status);
+    console.error("[INS] Data:", JSON.stringify(err.response?.data, null, 2));
+    console.error("[INS] Message:", err.message);
+    console.error("==================================================");
 
-    // 把 ACA-Py 回傳內容包進錯誤字串往外丟，server 那邊就看得到細節
     const detail =
       typeof err.response?.data === "string"
         ? err.response.data
@@ -103,6 +129,7 @@ export async function ensureInsurerSchemaAndCredDef() {
     throw new Error(detail);
   }
 }
+
 
 /** 建立 Schema */
 export async function createSchema({ name, version, attributes }) {

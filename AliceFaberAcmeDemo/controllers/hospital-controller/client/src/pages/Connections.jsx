@@ -23,7 +23,7 @@ export default function ConnectionsPage() {
 
         setConnections(sorted);
 
-        // 🔍 如果有「剛接受的那一條」，而且它已經變成 active，就切到 Connected
+        // 如果有「剛接受的那一條」，而且它已經變成 active，就切到 Connected
         if (justAcceptedId) {
           const found = sorted.find(
             (c) => c.connection_id === justAcceptedId && c.state === "active"
@@ -49,7 +49,7 @@ export default function ConnectionsPage() {
     fetchConnections();
   }, [fetchConnections]);
 
-  // 🔁 定期輪詢，讓 state 變 active 時自動更新畫面
+  //  定期輪詢，讓 state 變 active 時自動更新畫面
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchConnections();

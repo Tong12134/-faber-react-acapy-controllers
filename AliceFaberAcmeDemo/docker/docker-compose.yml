@@ -51,7 +51,6 @@ services:
         "--wallet-type", "askar",
         "--wallet-name", "patient_wallet",
         "--wallet-key", "patient_secret",
-        # "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
         "--genesis-url", "http://host.docker.internal:9000/genesis",
         "--auto-provision",
         "--auto-accept-invites",
@@ -83,7 +82,6 @@ services:
         "--wallet-name", "acme_wallet",
         "--wallet-key", "acme_secret",
         "--seed", "acme0000000000000000000000000001",
-        # "--genesis-url", "http://test.bcovrin.vonx.io/genesis",
         "--genesis-url", "http://host.docker.internal:9000/genesis",
         "--auto-provision",
         "--auto-accept-invites",
@@ -115,7 +113,7 @@ services:
       - hospital-agent
     environment:
       - RUNMODE=dev
-      - FABER_AGENT_HOST=hospital-agent
+      - HOSPITAL_AGENT_HOST=hospital-agent
 
   patient-controller:
     build:
@@ -131,7 +129,7 @@ services:
       - patient-agent
     environment:
       - RUNMODE=dev
-      - FABER_AGENT_HOST=patient-agent
+      - PATIENT_AGENT_HOST=patient-agent
 
   insurer-controller:
     build:
@@ -144,7 +142,7 @@ services:
       - insurer-agent
     environment:
       - RUNMODE=dev
-      - ACME_AGENT_HOST=insurer-agent
+      - INSURER_AGENT_HOST=insurer-agent
 
 volumes:
   hospital_wallet_data:

@@ -21,6 +21,8 @@ export default function CredentialsPage() {
   const [acceptingId, setAcceptingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [rejectingId, setRejectingId] = useState(null);  
+
   
   // Claim Logic States
   const [previewingId, setPreviewingId] = useState(null); 
@@ -91,27 +93,74 @@ export default function CredentialsPage() {
   };
 
   const handleAccept = async (offerId) => {
-    setAcceptingId(offerId);
-    try {
-      const res = await fetch(`/api/credentialOffers/${offerId}/accept`, { method: "POST" });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
-      
-      let tries = 0;
-      let stored = false;
-      while (tries < 8 && !stored) {
-        await new Promise((r) => setTimeout(r, 500));
-        const checkRes = await fetch("/api/credentials");
-        const checkData = await checkRes.json();
-        if (checkData.ok && decorateCredentials(checkData.credentials).length > credentials.length) {
-          setCredentials(decorateCredentials(checkData.credentials));
-          stored = true;
-        }
-        tries++;
+  if (!offerId) return;
+
+  setAcceptingId(offerId);
+  try {
+    const res = await fetch(`/api/credentialOffers/${offerId}/accept`, {
+      method: "POST",
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      alert("❌ Accept failed: " + data.error);
+      return;
+    }
+
+    // 等待 ACA-Py 自動 store 完成，再刷新 credentials
+    let tries = 0;
+    let stored = false;
+    while (tries < 8 && !stored) {
+      await new Promise((r) => setTimeout(r, 500));
+      const checkRes = await fetch("/api/credentials");
+      const checkData = await checkRes.json();
+      if (
+        checkData.ok &&
+        decorateCredentials(checkData.credentials).length > credentials.length
+      ) {
+        setCredentials(decorateCredentials(checkData.credentials));
+        stored = true;
       }
+      tries++;
+    }
+
+    // 最後更新一次 pending offers（這筆應該會消失）
+    await fetchOffers();
+  } catch (err) {
+    alert("❌ Accept Error: " + err.message);
+  } finally {
+    setAcceptingId(null);
+  }
+};
+
+  const handleReject = async (offerId) => {
+    if (!offerId) return;
+
+    const ok = window.confirm("確定要拒絕這個 credential offer 嗎？");
+    if (!ok) return;
+
+    setRejectingId(offerId);
+    try {
+      const res = await fetch(`/api/credentialOffers/${offerId}/reject`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        alert("❌ Reject failed: " + data.error);
+        return;
+      }
+
+      // 拒絕成功後，重新抓一次 offers，這張卡片就會消失
       await fetchOffers();
-    } catch (err) { alert("❌ Accept Error: " + err.message); } finally { setAcceptingId(null); }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error while rejecting offer: " + err.message);
+    } finally {
+      setRejectingId(null); // 這裡只要設回 null 就好
+    }
   };
+
 
   // Claim Logic
   const getSelectedAttrsForCred = (cred) => {
@@ -386,8 +435,23 @@ export default function CredentialsPage() {
               const credExId = offer.credential_exchange_id || offer.id;
               const schemaId = offer.schema_id || "";
               const schemaParts = schemaId.split(':');
-              const schemaName = schemaParts.length > 2 ? `${schemaParts[2]} v${schemaParts[3]}` : schemaId;
-              const issuerLabel = offer.issuerLabel || "Hospital";
+              const schemaName = schemaParts.length > 3 ? `${schemaParts[2]} v${schemaParts[3]}` : schemaId;
+              //const issuerLabel = offer.issuerLabel || "Hospital";
+
+              // 從 cred def / schema 推 issuer DID
+              const credDefId =
+                offer.credential_definition_id ||
+                offer.cred_def_id ||
+                ""; // 有時欄位名字不同
+
+              let issuerDid = offer.issuerDid;
+              if (!issuerDid && credDefId) issuerDid = credDefId.split(":")[0] || "";
+              if (!issuerDid && schemaId) issuerDid = schemaId.split(":")[0] || "";
+
+              // 用 DID_LABELS 對應出 Hospital / Insurer
+              const issuerLabel =
+                DID_LABELS[issuerDid] || offer.issuerLabel || issuerDid || "Unknown Issuer";
+
 
               return (
                 <div key={credExId} style={styles.cardBase}>
@@ -408,6 +472,13 @@ export default function CredentialsPage() {
                     </div>
 
                     {/* 右側按鈕 */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",           // ← 這個決定兩顆按鈕的距離
+                      }}
+                    >
                     <button
                       onClick={() => handleAccept(credExId)}
                       disabled={acceptingId === credExId}
@@ -420,8 +491,22 @@ export default function CredentialsPage() {
                     >
                       {acceptingId === credExId ? "Accepting..." : "Accept"}
                     </button>
+
+                    <button
+                      onClick={() => handleReject(credExId)}
+                      disabled={rejectingId === credExId}
+                      style={{
+                        ...styles.btnPill,
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #fecaca",
+                        color: "#b91c1c",
+                      }}
+                    >
+                      {rejectingId === credExId ? "Rejecting..." : "Reject"}
+                    </button>
                   </div>
                 </div>
+              </div>
               );
             })}
           </div>

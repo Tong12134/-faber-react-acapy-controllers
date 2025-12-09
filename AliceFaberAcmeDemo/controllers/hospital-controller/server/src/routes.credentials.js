@@ -99,7 +99,7 @@ router.post("/send", async (req, res) => {
       comment: "Hospital issues diagnosis credential",
       auto_issue: true,
       auto_remove: false,
-      credential_proposal: credentialProposal, // 🔴 關鍵：用 credential_proposal，而不是 credential_preview
+      credential_proposal: credentialProposal, //  關鍵：用 credential_proposal，而不是 credential_preview
     };
 
     console.log("[credentials/send] sending to ACA-Py:", payload);

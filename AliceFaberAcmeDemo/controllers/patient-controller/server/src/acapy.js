@@ -186,28 +186,84 @@ export async function getCredentialDefinition(defId) {
 
 /** 取得「已存進錢包」的 credentials → My Credentials 用 */
 export async function getCredentials() {
-  const res = await axios.get(`${AGENT_BASE}/credentials`);
-  return res.data.results || [];
-}
-
-/** 刪除一張已存進 wallet 的 credential */
-export async function removeCredential(credId) {
   try {
-    const res = await axios.delete(`${AGENT_BASE}/credentials/${credId}`);
-    return res.data;
+    const res = await axios.get(`${AGENT_BASE}/credentials`);
+    // ACA-Py 1.2 的格式通常是 { results: [ { referent, attrs, schema_id, cred_def_id, ... } ] }
+    return res.data.results || res.data;
   } catch (err) {
     console.error(
-      "ACA-Py /credentials/{id} DELETE error:",
+      "ACA-Py GET /credentials error:",
       err.response?.status,
       err.response?.data || err.message
     );
-    throw new Error(
-      typeof err.response?.data === "string"
-        ? err.response.data
-        : JSON.stringify(err.response?.data || { error: err.message })
-    );
+    throw err;
   }
 }
+
+/** 刪除一張已存進 wallet 的 credential */
+// acapy.js
+
+/** 刪除一張已儲存的 Credential */
+export async function removeCredential(credentialId) {
+  if (!credentialId) {
+    throw new Error("credentialId is required");
+  }
+
+  try {
+    const res = await axios.delete(`${AGENT_BASE}/credential/${credentialId}`);
+    // 1.2 LTS：刪除成功通常回 200 + 空 body 或簡單 json
+    return res.data;
+  } catch (err) {
+    console.error(
+      "[PS] ACA-Py DELETE /credential/{id} error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
+}
+
+/** 拒絕 Credential Offer → 送 problem-report + 刪掉 record */
+export async function rejectCredentialOffer(
+  credExId,
+  reason = "User rejected credential offer"
+) {
+  try {
+    // 1) 送 problem-report（注意：一定要叫 description）
+    await axios.post(
+      `${AGENT_BASE}/issue-credential/records/${credExId}/problem-report`,
+      { description: reason },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    // 2) 可選：順手把這筆 exchange record 刪掉
+    await axios.delete(
+      `${AGENT_BASE}/issue-credential/records/${credExId}`
+    );
+
+    return { ok: true };
+  } catch (err) {
+    console.error(
+      "[PS] ACA-Py reject credential offer error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
+}
+
 
 /** Remove connection */
 export async function removeConnection(id) {
@@ -221,21 +277,6 @@ export async function removeConnection(id) {
       err.response?.data || err.message
     );
     throw new Error(err.response?.data?.error || err.message);
-  }
-}
-
-// 取得 issue-credential records（給 Patient 看「還沒接受的邀請」）
-export async function getCredentialRecords() {
-  try {
-    const res = await axios.get(`${AGENT_BASE}/issue-credential/records`);
-    return res.data.results || [];
-  } catch (e) {
-    console.error(
-      "getCredentialRecords error:",
-      e.response?.status,
-      e.response?.data || e.message
-    );
-    throw e;
   }
 }
 
@@ -291,18 +332,48 @@ export async function getCredentialOffers() {
   }
 }
 
+// 取得單一 issue-credential record（用在 Accept / Debug 等）
+export async function getCredentialRecord(credExId) {
+  if (!credExId) {
+    throw new Error("credExId is required");
+  }
+
+  try {
+    const res = await axios.get(
+      `${AGENT_BASE}/issue-credential/records/${credExId}`
+    );
+    // ACA-Py 1.2: 回傳是一整個 record 物件
+    return res.data;
+  } catch (err) {
+    console.error(
+      "[PS] ACA-Py GET /issue-credential/records/{id} error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
+}
+
+
 
 /** 接受某一筆 offer：只送 request，不在這裡 store */
 /** 按下 Accept 時，對 ACA-Py 下 send-request（做法 B 第一步） */
 export async function acceptCredentialOffer(credExId) {
   try {
     const res = await axios.post(
-      `${AGENT_BASE}/issue-credential/records/${credExId}/send-request`
+      `${AGENT_BASE}/issue-credential/records/${credExId}/send-request`,
+      {}
     );
     return res.data;
   } catch (err) {
     console.error(
-      "ACA-Py /send-request error:",
+       "[PS] ACA-Py accept credential offer error:",
       err.response?.status,
       err.response?.data || err.message
     );
@@ -313,6 +384,8 @@ export async function acceptCredentialOffer(credExId) {
     throw new Error(detail);
   }
 }
+
+
 
 export async function acceptRequest(connectionId) {
   const res = await axios.post(

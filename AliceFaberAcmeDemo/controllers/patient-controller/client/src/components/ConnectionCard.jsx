@@ -12,7 +12,7 @@ export default function ConnectionCard({ connection, onRefresh }) {
     error: "#b91c1c",
   }[state] || "#6b7280";
 
-  // 🔹 刪除連線
+  //  刪除連線
   const handleRemove = async () => {
     const ok = window.confirm(
       `確定要刪除此連線嗎？\n\nconnection_id: ${connection_id}`

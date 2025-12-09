@@ -44,16 +44,22 @@ router.get("/", async (req, res) => {
 
     const ISSUER_LABELS = {
       "QWTxizRo9A1tWdEPYkFPHe": "Hospital",
+      "HZnimaMX5B9zwh13thnNLG": "Insurer",
     };
 
-    const credentials = rawCreds.map((c) => {
-      const issuerDid = (c.cred_def_id || "").split(":")[0];
-      const issuerLabel = ISSUER_LABELS[issuerDid] || "Unknown Issuer";
+    const credentials = (rawCreds || []).map((c) => {
+      const credDefId = c.cred_def_id || c.credential_definition_id || "";
+      const issuerDid = credDefId ? credDefId.split(":")[0] : undefined;
+      const issuerLabel =
+        ISSUER_LABELS[issuerDid] || c.issuerLabel || issuerDid || "Unknown Issuer";
+
 
       return {
-        id: c.cred_id || c.referent,
+        id: c.referent,
+        // id: c.cred_id || c.referent,
         schemaId: c.schema_id,
-        credDefId: c.cred_def_id,
+        // credDefId: c.cred_def_id,
+        credDefId,
         issuerDid,
         issuerLabel,
         attrs: c.attrs || {},
@@ -74,8 +80,17 @@ router.post("/:id/remove", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("remove-credential error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    // 如果 ACA-Py 回 404，就當作「前端 state 落後，幫他同步清掉」
+  if (String(err.message).includes("404")) {
+    return res.json({
+      ok: false,
+      error: "Credential not found on agent, it may have been already removed.",
+    });
   }
+
+  res.status(500).json({ ok: false, error: err.message });
+}
+
 });
 
 export default router;
