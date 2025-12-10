@@ -21,9 +21,11 @@ export default function CredentialsPage() {
   const [acceptingId, setAcceptingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [rejectingId, setRejectingId] = useState(null);  
-
+  const [rejectingId, setRejectingId] = useState(null);
   
+  // 讓每一張「醫院憑證」記住目前選擇的保單 VC ID
+  const [policySelectionByCredId, setPolicySelectionByCredId] = useState({});
+
   // Claim Logic States
   const [previewingId, setPreviewingId] = useState(null); 
   const [claimPreviewByCredId, setClaimPreviewByCredId] = useState({});
@@ -181,18 +183,62 @@ export default function CredentialsPage() {
     setSelectedAttrsByCredId((prev) => prev[cred.id] ? prev : { ...prev, [cred.id]: new Set(Object.keys(getRawAttrsForCred(cred))) });
   };
 
+  // 找到一張要用來試算的保單 VC（先簡單用第一張 Insurer 發的 VC）
+  const findPolicyCredential = () => {
+    return credentials.find(
+      (c) =>
+        c.issuerDid === INSURER_DID ||
+        c.issuerLabel === "Insurer"
+    );
+  };
+
   const handlePreviewClaim = async (cred) => {
     setPreviewingId(cred.id);
     try {
-      const res = await fetch("http://localhost:5070/api/claim/preview-from-hospital-credential", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credentialAttrs: getSelectedAttrsForCred(cred) }),
-      });
+      // 1) 醫院 VC 的欄位（你原本就有）
+      const hospitalAttrs = getSelectedAttrsForCred(cred);
+
+      // 2) 找出這張醫院 VC 目前選擇的保單 VC
+      const selectedPolicyId = policySelectionByCredId[cred.id];
+      let policyAttrs = null;
+
+      if (selectedPolicyId) {
+        const policyCred = credentials.find((c) => c.id === selectedPolicyId);
+        if (policyCred) {
+          policyAttrs = getRawAttrsForCred(policyCred);
+        }
+      }
+
+      // 3) 組 payload：新版後端吃 hospitalCredentialAttrs / policyCredentialAttrs
+      const payload = {
+        hospitalCredentialAttrs: hospitalAttrs,
+      };
+      if (policyAttrs) {
+        payload.policyCredentialAttrs = policyAttrs;
+      }
+
+      const res = await fetch(
+        `${INSURER_API_BASE}/api/claim/preview-from-hospital-credential`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
+
       setClaimPreviewByCredId((prev) => ({ ...prev, [cred.id]: data.preview }));
-    } catch (err) { alert("❌ 試算失敗：" + err.message); } finally { setPreviewingId(null); }
+    } catch (err) {
+      alert("❌ 試算失敗：" + err.message);
+    } finally {
+      setPreviewingId(cred.id);
+      setPreviewingId(null);
+    }
   };
+
+
 
   const handleSubmitClaim = async (cred) => {
     setSubmittingId(cred.id);
@@ -208,6 +254,14 @@ export default function CredentialsPage() {
   };
 
   useEffect(() => { fetchCredentials(); fetchOffers(); }, []);
+
+
+  // 全部 VC 中，挑出由 Insurer 發的（當保單使用）
+const insurerCredentials = credentials.filter(
+  (cred) =>
+    cred.issuerDid === INSURER_DID || cred.issuerLabel === "Insurer"
+);
+
 
   // Filter Logic
   const filteredCredentials = [...credentials].reverse().filter((cred) => {
@@ -854,6 +908,69 @@ export default function CredentialsPage() {
                       )}
                     </div>
 
+                    {/* 保單選擇（用保險公司發出的 VC） */}
+                    <div
+                      style={{
+                        marginBottom: "10px",
+                        padding: "8px 10px",
+                        borderRadius: "8px",
+                        backgroundColor: "#eef2ff",
+                        border: "1px solid #c7d2fe",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#3730a3",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        套用的保單：
+                      </span>
+
+                      <select
+                        value={policySelectionByCredId[cred.id] || ""}
+                        onChange={(e) => {
+                          const value = e.target.value || null;
+                          setPolicySelectionByCredId((prev) => ({
+                            ...prev,
+                            [cred.id]: value,
+                          }));
+                        }}
+                        style={{
+                          flex: 1,
+                          fontSize: "12px",
+                          padding: "6px 8px",
+                          borderRadius: "999px",
+                          border: "1px solid #c7d2fe",
+                          outline: "none",
+                        }}
+                      >
+                        <option value="">
+                          （不套用保單，只做示意試算）
+                        </option>
+                        {insurerCredentials.map((policyCred) => {
+                          const attrs = getRawAttrsForCred(policyCred);
+                          const policyName =
+                            attrs.product_name ||
+                            attrs.coverage_type ||
+                            policyCred.schemaId ||
+                            policyCred.id;
+                          return (
+                            <option key={policyCred.id} value={policyCred.id}>
+                              {policyName}（ID: {policyCred.id.slice(0, 6)}...）
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+
+
                     <div
                       style={{
                         display: "flex",
@@ -902,65 +1019,94 @@ export default function CredentialsPage() {
                   </div>
                 )}
 
+
                 {/* 試算結果 */}
-                {activeTab === "hospital" && claimPreviewByCredId[cred.id] && (
-                  <div
-                    style={{
-                      marginTop: "12px",
-                      borderRadius: "12px",
-                      background: "#f0fdf4",
-                      border: "1px solid #bbf7d0",
-                      padding: "14px 16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        marginBottom: "8px",
-                        color: "#166534",
-                      }}
-                    >
-                      預估理賠結果
-                    </div>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "13px",
-                        color: "#14532d",
-                      }}
-                    >
-                      可否理賠：
-                      {claimPreviewByCredId[cred.id].eligible
-                        ? "可以"
-                        : "不可以"}
-                    </p>
-                    <p
-                      style={{
-                        margin: "4px 0 8px",
-                        fontSize: "13px",
-                        color: "#14532d",
-                      }}
-                    >
-                      預估金額：
-                      {claimPreviewByCredId[cred.id].totalPayout} 元
-                    </p>
-                    <ul
-                      style={{
-                        margin: 0,
-                        paddingLeft: "18px",
-                        fontSize: "12px",
-                        color: "#166534",
-                      }}
-                    >
-                      {claimPreviewByCredId[cred.id].breakdown.map(
-                        (r, idx) => (
-                          <li key={idx}>{r}</li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
+                {activeTab === "hospital" &&
+                  claimPreviewByCredId[cred.id] &&
+                  (() => {
+                    const selectedPolicyId = policySelectionByCredId[cred.id];
+                    const selectedPolicyCred = selectedPolicyId
+                      ? credentials.find((c) => c.id === selectedPolicyId)
+                      : null;
+                    const selectedPolicyAttrs = selectedPolicyCred
+                      ? getRawAttrsForCred(selectedPolicyCred)
+                      : null;
+                    const selectedPolicyName =
+                      selectedPolicyAttrs?.product_name ||
+                      selectedPolicyAttrs?.coverage_type ||
+                      (selectedPolicyCred && selectedPolicyCred.schemaId);
+
+                    return (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          borderRadius: "12px",
+                          background: "#f0fdf4",
+                          border: "1px solid #bbf7d0",
+                          padding: "14px 16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            marginBottom: "8px",
+                            color: "#166534",
+                          }}
+                        >
+                          預估理賠結果
+                        </div>
+
+                        {/* 顯示這次是用哪張保單算的 */}
+                        {selectedPolicyCred && (
+                          <p
+                            style={{
+                              margin: "0 0 8px",
+                              fontSize: "12px",
+                              color: "#15803d",
+                            }}
+                          >
+                            本次試算使用保單：
+                            <strong>{selectedPolicyName || "未命名保單"}</strong>
+                            （ID: {selectedPolicyCred.id.slice(0, 8)}...）
+                          </p>
+                        )}
+
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "13px",
+                            color: "#14532d",
+                          }}
+                        >
+                          可否理賠：
+                          {claimPreviewByCredId[cred.id].eligible ? "可以" : "不可以"}
+                        </p>
+                        <p
+                          style={{
+                            margin: "4px 0 8px",
+                            fontSize: "13px",
+                            color: "#14532d",
+                          }}
+                        >
+                          預估金額：
+                          {claimPreviewByCredId[cred.id].totalPayout} 元
+                        </p>
+                        <ul
+                          style={{
+                            margin: 0,
+                            paddingLeft: "18px",
+                            fontSize: "12px",
+                            color: "#166534",
+                          }}
+                        >
+                          {claimPreviewByCredId[cred.id].breakdown.map((r, idx) => (
+                            <li key={idx}>{r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
 
 
                 {/* 送出結果 */}

@@ -1,6 +1,6 @@
 // controllers/insurer-controller/server/src/claimPreview.js
-// 「mapper + 試算邏輯」
 
+// ==== 1. Encounter VC → DTO ====
 export function credAttrsToEncounterDTO(attrs) {
   const get = (name) => (attrs[name] !== undefined ? String(attrs[name]) : null);
 
@@ -65,21 +65,74 @@ function calcStayDays(admissionDate, dischargeDate) {
   return diffDays;
 }
 
+// ==== 2. Policy VC → DTO ====
 
+export function credAttrsToPolicyDTO(attrs) {
+  const get = (name) =>
+    attrs[name] !== undefined ? String(attrs[name]) : null;
+  const getNum = (name) =>
+    attrs[name] !== undefined ? Number(attrs[name]) || 0 : 0;
 
-export function previewClaimFromEncounter(dto) {
+  return {
+    policyId: get("policy_id"),
+    productName: get("product_name"),
+    coverageType: get("coverage_type"),
+    coverageStartDate: get("coverage_start_date"),
+    coverageEndDate: get("coverage_end_date"),
+    hospitalDailyCash: getNum("hospital_daily_cash"),
+    surgeryBenefit: getNum("surgery_benefit"),
+  };
+}
+
+// ==== 3. 用「模板」產出條款說明文字 ====
+
+export function buildPolicyRuleDescriptions(policy) {
+  const lines = [];
+
+  if (policy.hospitalDailyCash > 0) {
+    lines.push(
+      `規則 1：住院日額（住院類型為 INPATIENT，且住滿至少 1 天，每日給付 ${policy.hospitalDailyCash} 元）`
+    );
+  }
+
+  if (policy.surgeryBenefit > 0) {
+    lines.push(
+      `規則 2：若有手術紀錄，給付手術一次金 ${policy.surgeryBenefit} 元`
+    );
+  }
+
+  if (!lines.length) {
+    lines.push("目前保單未設定任何試算規則或給付金額。");
+  }
+
+  return lines;
+}
+
+// ==== 4. 試算理賠：依據保單 VC 的數值來算 ====
+
+export function previewClaimFromEncounter(dto, policyConfig = {}) {
   let total = 0;
   const reasons = [];
 
-  // 規則 1：住院日額（INPATIENT && 住院 >= 1 天，每天 3000）
+  // 從 policyConfig 讀金額，沒有就當 0
+  const hospitalDailyCash =
+    Number(policyConfig.hospitalDailyCash ?? policyConfig.hospital_daily_cash ?? 0) || 0;
+  const surgeryBenefit =
+    Number(policyConfig.surgeryBenefit ?? policyConfig.surgery_benefit ?? 0) || 0;
+
+  // 規則 1：住院日額
   if (dto.encounterClass === "INPATIENT") {
     const days = calcStayDays(dto.admissionDate, dto.dischargeDate);
 
-    if (days >= 1) {
-      const perDay = 3000;
+    if (days >= 1 && hospitalDailyCash > 0) {
+      const perDay = hospitalDailyCash;
       const amount = days * perDay;
       total += amount;
-      reasons.push(`住院 ${days} 天，符合日額給付，每日 ${perDay} 元，共 ${amount} 元`);
+      reasons.push(
+        `住院 ${days} 天，符合日額給付，每日 ${perDay} 元，共 ${amount} 元`
+      );
+    } else if (days >= 1 && hospitalDailyCash === 0) {
+      reasons.push(`住院 ${days} 天，但保單未設定住院日額金額（hospital_daily_cash）。`);
     } else {
       reasons.push(`住院未滿 1 天（${days} 天），不符合日額給付門檻`);
     }
@@ -89,20 +142,33 @@ export function previewClaimFromEncounter(dto) {
     );
   }
 
-  // 規則 2：有手術碼就給一次金 10000
+  // 規則 2：手術一次金
   if (dto.procedureCode && dto.procedureCode.trim() !== "") {
-    const surgeryAmount = 10000;
-    total += surgeryAmount;
-    reasons.push(
-      `有手術紀錄（${dto.procedureCode} ${dto.procedureDisplay || ""}），給付手術一次金 ${surgeryAmount} 元`
-    );
+    if (surgeryBenefit > 0) {
+      const amount = surgeryBenefit;
+      total += amount;
+      reasons.push(
+        `有手術紀錄（${dto.procedureCode} ${dto.procedureDisplay || ""}），給付手術一次金 ${amount} 元`
+      );
+    } else {
+      reasons.push(
+        `有手術紀錄，但保單未設定手術一次金金額（surgery_benefit）。`
+      );
+    }
   } else {
-    reasons.push(`無手術紀錄，無手術一次金給付`);
+    reasons.push("無手術紀錄，無手術一次金給付");
   }
+
+  // 額外回傳：policy 規則描述（給前端顯示條款）
+  const policyRules = buildPolicyRuleDescriptions({
+    hospitalDailyCash,
+    surgeryBenefit,
+  });
 
   return {
     eligible: total > 0,
     totalPayout: total,
     breakdown: reasons,
+    policyRules, // 前端可以顯示「這張保單的給付規則」
   };
 }

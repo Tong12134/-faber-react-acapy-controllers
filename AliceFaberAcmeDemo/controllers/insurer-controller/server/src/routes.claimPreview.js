@@ -3,6 +3,7 @@
 import express from "express";
 import {
   credAttrsToEncounterDTO,
+  credAttrsToPolicyDTO,
   previewClaimFromEncounter,
 } from "./claimPreview.js";
 import {
@@ -21,15 +22,32 @@ const router = express.Router();
  */
 router.post("/preview-from-hospital-credential", async (req, res) => {
   try {
-    const rawAttrs = req.body.credentialAttrs || {};
-    const flattened = flattenAttrs(rawAttrs);
+    const {
+      hospitalCredentialAttrs,
+      policyCredentialAttrs,
+      credentialAttrs, // 舊版仍然支援
+    } = req.body || {};
 
-    const dto = credAttrsToEncounterDTO(flattened);
-    const preview = previewClaimFromEncounter(dto);
+    // 1) 取得醫院 VC 的 attrs（優先用新欄位，沒有就用舊的 credentialAttrs）
+    const rawHospitalAttrs =
+      hospitalCredentialAttrs || credentialAttrs || {};
+    const hospitalFlattened = flattenAttrs(rawHospitalAttrs);
+    const encounterDto = credAttrsToEncounterDTO(hospitalFlattened);
+
+    // 2) 取得保單 VC 的 attrs（可能暫時沒有，就給空物件）
+    const rawPolicyAttrs = policyCredentialAttrs || {};
+    const policyFlattened = flattenAttrs(rawPolicyAttrs);
+    const policyDto = credAttrsToPolicyDTO(policyFlattened);
+
+    // 3) 丟進新版的試算邏輯（裡面會用模板組出條款說明）
+    const preview = previewClaimFromEncounter(encounterDto, policyDto);
 
     res.json({
       ok: true,
       preview,
+      // 如果前端要顯示，也可以把這兩個 DTO 一併回傳
+      encounter: encounterDto,
+      policy: policyDto,
     });
   } catch (err) {
     console.error("[claim preview] error:", err);
@@ -39,6 +57,7 @@ router.post("/preview-from-hospital-credential", async (req, res) => {
     });
   }
 });
+
 
 /**
  * 2) 送出正式理賠申請
