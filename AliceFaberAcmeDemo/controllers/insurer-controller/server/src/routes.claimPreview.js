@@ -62,19 +62,44 @@ router.post("/preview-from-hospital-credential", async (req, res) => {
 /**
  * 2) 送出正式理賠申請
  * POST /api/claim/submit
- * body: { credentialAttrs: {...}, insuredId?: string, policyId?: string }
+ * body:
+ *  {
+ *    hospitalCredentialAttrs: {...},   // 醫院 VC attrs
+ *    policyCredentialAttrs?: {...},    // 保單 VC attrs
+ *    insuredId?: string,
+ *    policyId?: string
+ *  }
  */
 router.post("/submit", async (req, res) => {
   try {
-    const { credentialAttrs, insuredId, policyId } = req.body || {};
+    const {
+      hospitalCredentialAttrs,
+      policyCredentialAttrs,
+      credentialAttrs,     // 舊版相容用
+      insuredId,
+      policyId,
+    } = req.body || {};
 
-    if (!credentialAttrs) {
+    // 相容：如果舊前端送的是 credentialAttrs，就當成 hospitalCredentialAttrs
+    const hospitalAttrs = hospitalCredentialAttrs || credentialAttrs || null;
+
+    if (!hospitalAttrs) {
       return res
         .status(400)
-        .json({ ok: false, error: "credentialAttrs is required" });
+        .json({ ok: false, error: "hospitalCredentialAttrs / credentialAttrs is required" });
     }
 
-    const claim = createClaim({ credentialAttrs, insuredId, policyId });
+    console.log(
+      "[IS] [/submit] incoming body:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const claim = createClaim({
+      credentialAttrs: hospitalAttrs,      // 給 claimStore
+      policyCredentialAttrs,              // 可能為 undefined，沒關係
+      insuredId,
+      policyId,
+    });
 
     res.json({
       ok: true,
@@ -88,6 +113,7 @@ router.post("/submit", async (req, res) => {
     });
   }
 });
+
 
 /**
  * 3) 列出某個 insured 的所有 claims

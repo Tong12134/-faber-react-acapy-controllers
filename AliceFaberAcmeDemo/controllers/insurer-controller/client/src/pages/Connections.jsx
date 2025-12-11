@@ -49,7 +49,7 @@ export default function ConnectionsPage() {
     fetchConnections();
   }, [fetchConnections]);
 
-  // 🔁 定期輪詢，讓 state 變 active 時自動更新畫面
+  // 定期輪詢，讓 state 變 active 時自動更新畫面
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchConnections();

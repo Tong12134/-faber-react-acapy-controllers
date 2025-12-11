@@ -22,8 +22,8 @@ export async function ping() {
 
 /** 確保 Hospital 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureHospitalSchemaAndCredDef() {
-  const SCHEMA_NAME = "HospitalEncounterSummaryV5";
-  const SCHEMA_VERSION = "1.0.3";
+  const SCHEMA_NAME = "HospitalEncounterSummaryV6";
+  const SCHEMA_VERSION = "1.0.4";
 
   const ATTRIBUTES = [
     "patient_id",
@@ -33,6 +33,7 @@ export async function ensureHospitalSchemaAndCredDef() {
     "encounter_date",
     "encounter_class",
     "encounter_department",
+    // "encounter_global_id", // 全域唯一 ID（UUID）：用來辨識是否為理賠過的同一筆就診紀錄
     "diagnosis_system",
     "diagnosis_code",
     "diagnosis_display",

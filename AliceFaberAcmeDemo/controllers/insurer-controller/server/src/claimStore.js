@@ -2,6 +2,7 @@
 
 import {
   credAttrsToEncounterDTO,
+  credAttrsToPolicyDTO,
   previewClaimFromEncounter,
 } from "./claimPreview.js";
 
@@ -22,10 +23,46 @@ export function flattenAttrs(rawAttrs = {}) {
   return flat;
 }
 
-export function createClaim({ credentialAttrs, insuredId, policyId }) {
-  const flatAttrs = flattenAttrs(credentialAttrs);
-  const dto = credAttrsToEncounterDTO(flatAttrs);
-  const preview = previewClaimFromEncounter(dto);
+/**
+ * createClaim
+ * 支援兩種呼叫方式：
+ *
+ * 1) 新版（建議）：
+ *    createClaim({
+ *      hospitalCredentialAttrs,
+ *      policyCredentialAttrs,
+ *      insuredId,
+ *      policyId,
+ *    })
+ *
+ * 2) 舊版（只有醫院 VC）：
+ *    createClaim({
+ *      credentialAttrs,
+ *      insuredId,
+ *      policyId,
+ *    })
+ */
+export function createClaim({
+  hospitalCredentialAttrs,
+  policyCredentialAttrs,
+  credentialAttrs, // 舊版相容：當成 hospitalCredentialAttrs 用
+  insuredId,
+  policyId,
+} = {}) {
+  // 1) 醫院 VC attrs（優先用 hospitalCredentialAttrs，沒有就用 credentialAttrs）
+  const hospitalAttrs = hospitalCredentialAttrs || credentialAttrs || {};
+  const flatHospital = flattenAttrs(hospitalAttrs);
+  const encounterDTO = credAttrsToEncounterDTO(flatHospital);
+
+  // 2) 保單 VC attrs（可能沒有）
+  const flatPolicy = flattenAttrs(policyCredentialAttrs || {});
+  const policyDTO = credAttrsToPolicyDTO(flatPolicy);
+
+  console.log("[IS] [createClaim] encounterDTO =", encounterDTO);
+  console.log("[IS] [createClaim] policyDTO    =", policyDTO);
+
+  // 3) 用 Encounter + Policy 做試算
+  const preview = previewClaimFromEncounter(encounterDTO, policyDTO);
 
   const claimId = `CLAIM-${String(seq++).padStart(6, "0")}`;
   const now = new Date().toISOString();
@@ -39,26 +76,28 @@ export function createClaim({ credentialAttrs, insuredId, policyId }) {
     updatedAt: now,
 
     // 一些方便列表顯示的欄位
-    hospitalId: dto.hospitalId,
-    hospitalName: dto.hospitalName,
-    encounterId: dto.encounterId,
-    encounterClass: dto.encounterClass,
-    admissionDate: dto.admissionDate,
-    dischargeDate: dto.dischargeDate,
+    hospitalId: encounterDTO.hospitalId,
+    hospitalName: encounterDTO.hospitalName,
+    encounterId: encounterDTO.encounterId,
+    encounterClass: encounterDTO.encounterClass,
+    admissionDate: encounterDTO.admissionDate,
+    dischargeDate: encounterDTO.dischargeDate,
 
-    // 試算結果
+    // 試算結果（已經吃到保單金額）
     preview,
 
     // 原始資料（之後想要轉 FHIR / 做 LLM 用得上）
-    credentialAttrs: flatAttrs,
-    encounterDTO: dto,
+    credentialAttrs: flatHospital,        // 保留原本名稱，表示醫院 VC
+    encounterDTO,                         // 保留給「內部 Encounter DTO」顯示
+    policyCredentialAttrs: flatPolicy,    // 新增：保單 VC 原始欄位
+    policyDTO,                            // 新增：保單 DTO（之後想顯示條款可以用）
   };
 
   claims.push(claim);
 
   console.log("[claimStore] 新增一筆 claim:");
   console.log(JSON.stringify(claim, null, 2));
-  
+
   return claim;
 }
 
@@ -71,7 +110,6 @@ export function getClaim(claimId) {
   return claims.find((c) => c.claimId === claimId) || null;
 }
 
-// 選擇性：如果你習慣用 import default，可以加這行
 export default {
   createClaim,
   listClaims,
