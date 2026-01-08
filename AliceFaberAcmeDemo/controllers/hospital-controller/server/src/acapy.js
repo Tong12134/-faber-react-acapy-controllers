@@ -33,7 +33,7 @@ export async function ensureHospitalSchemaAndCredDef() {
     "encounter_date",
     "encounter_class",
     "encounter_department",
-    // "encounter_global_id", // 全域唯一 ID（UUID）：用來辨識是否為理賠過的同一筆就診紀錄
+    // "encounter_global_id",    // 全域唯一 ID（UUID）：用來辨識是否為理賠過的同一筆就診紀錄
     "diagnosis_system",
     "diagnosis_code",
     "diagnosis_display",

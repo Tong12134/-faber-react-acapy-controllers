@@ -10,6 +10,18 @@ import {
 const claims = [];
 let seq = 1;
 
+//  Demo 用：預設保單設定（請依你 Patient 那邊的方案 B 調整數字）
+const DEMO_POLICIES = {
+  "POLICY-DEMO-001": {
+    policyId: "POLICY-DEMO-001",
+    productName: "住院日額保險方案 B",
+    coverageType: "HOSPITAL_CASH",
+    hospitalDailyCash: 2000,  // 每日 3000 元
+    surgeryBenefit: 10000,    // 手術一次金 10000 元
+  },
+};
+
+
 // helper：把 attrs 轉成單純 { key: raw }（支援 AnonCredAttr 或平面 map）
 export function flattenAttrs(rawAttrs = {}) {
   const flat = {};
@@ -22,6 +34,7 @@ export function flattenAttrs(rawAttrs = {}) {
   }
   return flat;
 }
+
 
 /**
  * createClaim
@@ -55,11 +68,34 @@ export function createClaim({
   const encounterDTO = credAttrsToEncounterDTO(flatHospital);
 
   // 2) 保單 VC attrs（可能沒有）
+  // const flatPolicy = flattenAttrs(policyCredentialAttrs || {});
+  // const policyDTO = credAttrsToPolicyDTO(flatPolicy);
+
+  // console.log("[IS] [createClaim] encounterDTO =", encounterDTO);
+  // console.log("[IS] [createClaim] policyDTO    =", policyDTO);
+
+  // 2) 保單 VC attrs（可能沒有）
   const flatPolicy = flattenAttrs(policyCredentialAttrs || {});
-  const policyDTO = credAttrsToPolicyDTO(flatPolicy);
+  let policyDTO = credAttrsToPolicyDTO(flatPolicy);
+
+  // 如果沒有從 VC 拿到金額，就用預設保單設定
+  const hasPolicyAmount =
+    (policyDTO.hospitalDailyCash && policyDTO.hospitalDailyCash > 0) ||
+    (policyDTO.surgeryBenefit && policyDTO.surgeryBenefit > 0);
+
+  if (!hasPolicyAmount) {
+    const fallback = DEMO_POLICIES[policyId || "POLICY-DEMO-001"];
+    if (fallback) {
+      policyDTO = {
+        ...policyDTO,
+        ...fallback,
+      };
+    }
+  }
 
   console.log("[IS] [createClaim] encounterDTO =", encounterDTO);
   console.log("[IS] [createClaim] policyDTO    =", policyDTO);
+
 
   // 3) 用 Encounter + Policy 做試算
   const preview = previewClaimFromEncounter(encounterDTO, policyDTO);
@@ -82,6 +118,9 @@ export function createClaim({
     encounterClass: encounterDTO.encounterClass,
     admissionDate: encounterDTO.admissionDate,
     dischargeDate: encounterDTO.dischargeDate,
+
+    // 在這裡多加一個：
+    estimatedPayout: preview.totalPayout ?? 0,
 
     // 試算結果（已經吃到保單金額）
     preview,

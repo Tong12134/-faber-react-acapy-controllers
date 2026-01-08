@@ -346,7 +346,7 @@ export default function ClaimsDashboard() {
             </section>
 
             {/* 試算結果 */}
-            {/* <section
+            <section
               style={{
                 marginBottom: "12px",
                 padding: "10px 12px",
@@ -384,7 +384,7 @@ export default function ClaimsDashboard() {
                   ))}
                 </ul>
               </div>
-            </section> */}
+            </section>
 
             {/* 原始欄位（encounterDTO） */}
             <section

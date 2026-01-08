@@ -104,7 +104,7 @@ services:
   # Controllers
   hospital-controller:
     build:
-      context: /Users/chenyantong/Desktop/(Name-react)acapy-controllers/AliceFaberAcmeDemo/controllers/hospital-controller
+      context: /Users/chenyantong/Desktop/(faber-react)acapy-controllers/AliceFaberAcmeDemo/controllers/hospital-controller
     ports:
       - 9021:5050
     networks:
@@ -117,7 +117,7 @@ services:
 
   patient-controller:
     build:
-      context: /Users/chenyantong/Desktop/(Name-react)acapy-controllers/AliceFaberAcmeDemo/controllers/patient-controller
+      context: /Users/chenyantong/Desktop/(faber-react)acapy-controllers/AliceFaberAcmeDemo/controllers/patient-controller
       # args:
       #   - RUNMODE=${RUNMODE}
       #   - ALICE_AGENT_HOST=${ALICE_AGENT_HOST}
@@ -133,7 +133,7 @@ services:
 
   insurer-controller:
     build:
-      context: /Users/chenyantong/Desktop/(Name-react)acapy-controllers/AliceFaberAcmeDemo/controllers/insurer-controller
+      context: /Users/chenyantong/Desktop/(faber-react)acapy-controllers/AliceFaberAcmeDemo/controllers/insurer-controller
     ports:
       - 9041:9050
     networks:
