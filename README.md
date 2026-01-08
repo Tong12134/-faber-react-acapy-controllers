@@ -6,7 +6,6 @@
 * 👤 **Patient**：以 Aries agent 持有 VC
 * 🏦 **Insurer**：驗證 VC、依保單條款試算理賠、建立 claim
 
----
 
 ## 架構概觀
 
@@ -29,7 +28,6 @@ Aries agent 透過 **Hyperledger Indy ledger**（`genesis-url: http://host.docke
 * `claimPreview.js`：`credAttrsToEncounterDTO`、`credAttrsToPolicyDTO`、`previewClaimFromEncounter`
 * `claimStore.js`：`createClaim` / `listClaims` / `getClaim`
 
----
 
 ## 事前準備
 
@@ -48,7 +46,6 @@ Aries agent 透過 **Hyperledger Indy ledger**（`genesis-url: http://host.docke
    * Docker、Docker Compose
    * macOS / Linux / Windows 其一
 
----
 
 ## docker-compose 重點（摘要）
 
@@ -100,7 +97,6 @@ hospital-controller:
 
 `patient-controller`、`insurer-controller` 的 `context` 也請改成你實際的 `(faber-react)...` 路徑。
 
----
 
 ## 啟動步驟
 
@@ -137,17 +133,15 @@ hospital-controller:
    * `hospital-agent` / `patient-agent` / `insurer-agent` → Up
    * `hospital-controller` / `patient-controller` / `insurer-controller` → Up
 
----
 
 ## 介面網址
 
-| 角色                  | URL                     |
-| ------------------- | ----------------------- |
-| Hospital Controller | `http://localhost:9021` |
-| Patient Controller  | `http://localhost:9031` |
-| Insurer Controller  | `http://localhost:9041` |
+| 角色            | URL                     |
+| ---------------| ----------------------- |
+| Hospital Agent | `http://localhost:8121` |
+| Patient Agent  | `http://localhost:8131` |
+| Insurer Agent  | `http://localhost:8141` |
 
----
 
 ## Demo 操作（超簡版）
 
@@ -159,7 +153,3 @@ hospital-controller:
 
    * 理賠申請列表（含預估理賠金額）
    * Claim 詳細內容與就醫摘要／DTO JSON／試算結果
-
----
-
-如果你之後 Indy 的啟動方式、genesis port 或 seed 有調整，只要改 README 裡「事前準備」那段就好。

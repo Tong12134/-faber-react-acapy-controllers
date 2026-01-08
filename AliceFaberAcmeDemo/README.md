@@ -13,7 +13,6 @@ cd von-network
 ./manage down
 ```
 
----
 
 ### 2. 啟動 Aries Agents（Hospital / Patient / Insurer）
 
@@ -23,8 +22,6 @@ docker compose up --build -d
 ```
 
 這一步會啟動三個 Aries agent 以及對應的容器服務。
-
----
 
 ### 3. 啟動 Controllers（前後端）
 
