@@ -143,7 +143,7 @@ hospital-controller:
 | Insurer Agent  | `http://localhost:8141` |
 
 
-## Demo 操作（超簡版）
+## Demo 操作
 
 1. 在 Hospital / Patient 之間建立連線（connection）
 2. Hospital 發行 Encounter VC → Patient 接受
