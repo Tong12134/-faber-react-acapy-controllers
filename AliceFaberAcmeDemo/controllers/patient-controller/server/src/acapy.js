@@ -385,6 +385,28 @@ export async function acceptCredentialOffer(credExId) {
   }
 }
 
+// 取得單一 proof record
+export async function getProofRecord(proofExId) {
+  if (!proofExId) throw new Error("proofExId is required");
+
+  try {
+    const res = await axios.get(
+      `${AGENT_BASE}/present-proof/records/${proofExId}`
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "[PS] ACA-Py GET /present-proof/records/{id} error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+    throw new Error(detail);
+  }
+}
 
 
 export async function acceptRequest(connectionId) {
@@ -416,8 +438,9 @@ export async function getProofs() {
 }
 
 // 自動替這個 proof_ex_id 找錢包裡可用的 credential，然後送 presentation
-// 自動替這個 proof_ex_id 找錢包裡可用的 credential，然後送 presentation
-export async function sendProofPresentation(proofExId) {
+// revealAttrNames: 可選，陣列，例如 ["encounter_class", "admission_date", ...]
+// 不傳或傳 null → 預設全部欄位 revealed: true
+export async function sendProofPresentation(proofExId, revealAttrNames = null) {
   try {
     // 1) 先拿這筆 proof exchange record，看它要哪些屬性
     const recRes = await axios.get(
@@ -436,8 +459,7 @@ export async function sendProofPresentation(proofExId) {
       throw new Error("No requested_attributes found in proof request.");
     }
 
-    // 這些 key 就是 referents，例如 "attr1_name"
-    const attrReferents = Object.keys(proofReq.requested_attributes);
+    const requestedAttrs = proofReq.requested_attributes;
 
     // 2) 一次把所有 candidate credentials 拿出來
     const credsRes = await axios.get(
@@ -446,13 +468,15 @@ export async function sendProofPresentation(proofExId) {
     const allCreds = credsRes.data || [];
 
     if (!allCreds.length) {
-      throw new Error("No matching credentials found in wallet for this proof request.");
+      throw new Error(
+        "No matching credentials found in wallet for this proof request."
+      );
     }
 
     const requestedAttributesBody = {};
 
     // 3) 對每一個 referent，找一張能用的 credential
-    for (const referent of attrReferents) {
+    for (const [referent, reqItem] of Object.entries(requestedAttrs)) {
       const match = allCreds.find((c) =>
         (c.presentation_referents || []).includes(referent)
       );
@@ -466,9 +490,18 @@ export async function sendProofPresentation(proofExId) {
       const credInfo = match.cred_info || match;
       const credId = credInfo.referent;
 
+      // attrName 就是 Aries proof request 裡的 name
+      const attrName =
+        reqItem.name ||
+        (Array.isArray(reqItem.names) ? reqItem.names[0] : referent);
+
+      // 如果沒傳 revealAttrNames → 全部 revealed = true
+      const revealThis =
+        !revealAttrNames || revealAttrNames.includes(attrName);
+
       requestedAttributesBody[referent] = {
         cred_id: credId,
-        revealed: true,
+        revealed: revealThis,
       };
     }
 
