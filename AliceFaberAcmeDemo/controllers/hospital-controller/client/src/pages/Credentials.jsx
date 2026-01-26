@@ -5,7 +5,7 @@ const SCHEMA_ATTR_ORDER = {
 
   // HospitalEncounterSummaryV1 的順序就鎖成這樣：
   // 用 "Schema Name" 當作 Key，這樣就不怕 ID 變來變去
-  "HospitalEncounterSummaryV5": [
+  "HospitalEncounterSummaryV6": [
     "patient_id",
     "patient_name", 
     "patient_birthdate_dateint", 
@@ -239,7 +239,7 @@ export default function CredentialsPage() {
 
     // 如果是 HospitalEncounterSummaryV1，就帶 demo 值；其他 schema 就用空值
     const defaults =
-      schemaName === "HospitalEncounterSummaryV5" ? HOSPITAL_DEMO_VALUES : {};
+      schemaName === "HospitalEncounterSummaryV6" ? HOSPITAL_DEMO_VALUES : {};
 
     updateField(
       "CredentialAttributesObject",

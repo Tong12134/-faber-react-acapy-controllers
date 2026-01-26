@@ -20,8 +20,8 @@ export async function ping() {
 
 /** 確保 insurer 專用的 Schema 與 Cred Def 已建立 */
 export async function ensureInsurerSchemaAndCredDef() {
-  const SCHEMA_NAME = "InsurancePolicyV5";
-  const SCHEMA_VERSION = "1.0.3";
+  const SCHEMA_NAME = "InsurancePolicyV6";
+  const SCHEMA_VERSION = "1.0.4";
   
   const ATTRIBUTES = [
     "policy_id",           // 保單號
@@ -36,8 +36,8 @@ export async function ensureInsurerSchemaAndCredDef() {
     "timestamp"            // 發行時間
   
   ];
-  
-  const TAG = "insurer-policy-v5"; 
+
+  const TAG = "insurer-policy-v6";
 
   try {
     // 1) 先找 schema（只找 wallet 已知的）
@@ -414,9 +414,15 @@ export async function getProofs() {
 // 發送 proof request（present-proof v1）
 export async function sendProofRequest(proofRequestJson) {
   try {
+    const body = {
+      auto_remove: false, // verified 之後不要自動刪掉 record
+      trace: false,
+      ...proofRequestJson, // 讓呼叫者原本傳進來的內容保留
+    };
+
     const res = await axios.post(
       `${AGENT_BASE}/present-proof/send-request`,
-      proofRequestJson,
+      body,
       {
         headers: { "Content-Type": "application/json" },
       }
@@ -437,6 +443,71 @@ export async function sendProofRequest(proofRequestJson) {
     throw new Error(detail);
   }
 }
+
+// 取得單一 proof record（這個可以維持不變）
+export async function getProofRecord(proofExId) {
+  try {
+    const res = await axios.get(
+      `${AGENT_BASE}/present-proof/records/${proofExId}`
+    );
+    return res.data;
+  } catch (err) {
+    console.error(
+      "[IS] ACA-Py GET /present-proof/records/{id} error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+    throw new Error(detail);
+  }
+}
+
+// 驗證 presentation：把完整結果印出來看
+// 驗證 presentation（debug 版：印出完整結果跟錯誤）
+export async function verifyProofPresentation(proofExId) {
+  try {
+    const url = `${AGENT_BASE}/present-proof/records/${proofExId}/verify-presentation`;
+    console.log("[IS] [verifyProofPresentation] calling:", url);
+
+    const res = await axios.post(
+      url,
+      {},
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    console.log(
+      "[IS] [verifyProofPresentation raw result] =",
+      JSON.stringify(res.data, null, 2)
+    );
+
+    return res.data;
+  } catch (err) {
+    console.error(
+      "[IS] ACA-Py POST /present-proof/records/{id}/verify-presentation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+
+    if (err.response?.data) {
+      console.error(
+        "[IS] [verifyProofPresentation error body] =",
+        JSON.stringify(err.response.data, null, 2)
+      );
+    }
+
+    const detail =
+      typeof err.response?.data === "string"
+        ? err.response.data
+        : JSON.stringify(err.response?.data || { error: err.message });
+
+    throw new Error(detail);
+  }
+}
+
+
 
 // 刪除一筆 present-proof record（只刪 controller 這邊的紀錄）
 export async function deleteProofRecord(proofExId) {

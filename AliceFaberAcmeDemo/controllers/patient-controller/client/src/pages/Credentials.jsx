@@ -165,23 +165,37 @@ export default function CredentialsPage() {
 
 
   // Claim Logic
+  // (現在不再讓使用者勾欄位，直接用整張 VC 的 attrs)
   const getSelectedAttrsForCred = (cred) => {
-    const rawAttrs = getRawAttrsForCred(cred);
-    const selectedKeys = selectedAttrsByCredId[cred.id];
-    if (!selectedKeys || selectedKeys.size === 0) return rawAttrs;
-    const subset = {};
-    for (const [key, value] of Object.entries(rawAttrs)) {
-      if (selectedKeys.has(key)) subset[key] = value;
-    }
-    return Object.keys(subset).length === 0 ? rawAttrs : subset;
+    return getRawAttrsForCred(cred);
   };
 
+  // const getSelectedAttrsForCred = (cred) => {
+  //   const rawAttrs = getRawAttrsForCred(cred);
+  //   const selectedKeys = selectedAttrsByCredId[cred.id];
+  //   if (!selectedKeys || selectedKeys.size === 0) return rawAttrs;
+  //   const subset = {};
+  //   for (const [key, value] of Object.entries(rawAttrs)) {
+  //     if (selectedKeys.has(key)) subset[key] = value;
+  //   }
+  //   return Object.keys(subset).length === 0 ? rawAttrs : subset;
+  // };
+
   const openPreviewSelector = (cred) => {
-    if (selectingPreviewForId === cred.id) { setSelectingPreviewForId(null); return; }
+    if (selectingPreviewForId === cred.id) {
+      setSelectingPreviewForId(null);
+      return;
+    }
     setSelectingPreviewForId(cred.id);
-    setExpandedId(null); 
-    setSelectedAttrsByCredId((prev) => prev[cred.id] ? prev : { ...prev, [cred.id]: new Set(Object.keys(getRawAttrsForCred(cred))) });
+    setExpandedId(null);
   };
+
+  // const openPreviewSelector = (cred) => {
+  //   if (selectingPreviewForId === cred.id) { setSelectingPreviewForId(null); return; }
+  //   setSelectingPreviewForId(cred.id);
+  //   setExpandedId(null); 
+  //   setSelectedAttrsByCredId((prev) => prev[cred.id] ? prev : { ...prev, [cred.id]: new Set(Object.keys(getRawAttrsForCred(cred))) });
+  // };
 
   // 找到一張要用來試算的保單 VC（先簡單用第一張 Insurer 發的 VC）
   const findPolicyCredential = () => {
@@ -238,20 +252,61 @@ export default function CredentialsPage() {
     }
   };
 
-
-
+  // 用這張醫療 VC 觸發 ZKP 理賠流程（發 proof request 給 Insurer）
   const handleSubmitClaim = async (cred) => {
     setSubmittingId(cred.id);
     try {
-      const res = await fetch(`${INSURER_API_BASE}/api/claim/submit`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credentialAttrs: getSelectedAttrsForCred(cred), insuredId: DEMO_INSURED_ID, policyId: DEMO_POLICY_ID }),
-      });
+      // 1) 先拿這張 VC 的原始 attrs
+      const attrs = getRawAttrsForCred(cred);
+
+      // 2) 目前還是用 encounter_id；之後加了 encounter_global_id 再替換
+      const encounterId = attrs.encounter_global_id || attrs.encounter_id;
+
+      if (!encounterId) {
+        throw new Error(
+          "這張醫療憑證沒有 encounter_id / encounter_global_id，無法申請理賠"
+        );
+      }
+
+      // 3) 呼叫 Insurer 的 ZKP 理賠 API（注意路徑 & 欄位名稱）
+      const res = await fetch(
+        `${INSURER_API_BASE}/api/proofs/claim-request`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            encounter_id: encounterId,      // ⭐ 跟後端對上
+            insuredId: DEMO_INSURED_ID,     // demo 用，看你要不要
+          }),
+        }
+      );
+
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
-      setSubmittedClaimByCredId((prev) => ({ ...prev, [cred.id]: data.claim }));
-    } catch (err) { alert("❌ 送出失敗：" + err.message); } finally { setSubmittingId(null); setSelectingPreviewForId(null); }
+      if (!data.ok) throw new Error(data.error || "unknown error");
+
+      // 4) 前端自己記錄一下「已送出 ZKP 理賠請求」（純顯示用）
+      setSubmittedClaimByCredId((prev) => ({
+        ...prev,
+        [cred.id]: {
+          status: "ZKP_REQUEST_SENT",
+          proofExId:
+            data.result?.presentation_exchange_id ||
+            data.result?.pres_ex_id ||
+            data.result?.id ||
+            null,
+        },
+      }));
+
+      alert("✅ 已發送 ZKP 證明請求，請到 Proofs 頁面查看並按 Accept。");
+    } catch (err) {
+      alert("❌ 理賠 ZKP 發送失敗：" + err.message);
+    } finally {
+      setSubmittingId(null);
+      setSelectingPreviewForId(null);
+    }
   };
+
+
 
   useEffect(() => { fetchCredentials(); fetchOffers(); }, []);
 
@@ -628,6 +683,7 @@ const insurerCredentials = credentials.filter(
                       {expandedId === cred.id ? "Hide attributes" : "Show attributes"}
                     </button>
 
+                 
                   {/* Hospital Only Buttons */}
                   {activeTab === "hospital" && (
                     <>

@@ -10,18 +10,18 @@ import proofs from "./src/routes.proofs.js";
 import credentialSchemas from "./src/routes.credentialSchemas.js";
 import credentialDefinitions from "./src/routes.credentialDefinitions.js";
 import credentials from "./src/routes.credentials.js";
-import webhooks from "./src/webhooks.js";
+import webhooksRouter from "./src/webhooks.js"; 
 import * as acapy from "./src/acapy.js";
 import { ensureInsurerSchemaAndCredDef } from "./src/acapy.js";
 import claimpreview from "./src/routes.claimPreview.js";
 // import claimRoutes from "./src/routes.claimPreview.js";
 //import { credAttrsToEncounterDTO, previewClaimFromEncounter } from "./claimPreview.js";
 
+dotenv.config();
 
 console.log("[SERVER] I am", process.env.SERVICE_NAME || "unknown");
 console.log("[SERVER] AGENT_URL =", process.env.AGENT_URL);
 
-dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -47,10 +47,8 @@ app.use("/api/credentialDefinitions", credentialDefinitions);
 app.use("/api/credentials", credentials);
 app.use("/api/claim", claimpreview);
 // app.use("/api/claim", claimRoutes);
+app.use("/webhooks", webhooksRouter);
 
-
-// Webhooks（需在 ACA-Py 啟動時指定）
-app.post("/webhooks/topic/:topic", webhooks);
 
 const PORT = process.env.PORT || 5070; 
 app.listen(PORT, async () => {

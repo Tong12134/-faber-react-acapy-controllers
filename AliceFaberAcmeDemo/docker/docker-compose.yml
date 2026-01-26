@@ -83,6 +83,7 @@ services:
         "--wallet-key", "acme_secret",
         "--seed", "acme0000000000000000000000000001",
         "--genesis-url", "http://host.docker.internal:9000/genesis",
+        "--webhook-url", "http://host.docker.internal:5070/webhooks",
         "--auto-provision",
         "--auto-accept-invites",
         "--auto-accept-requests",
