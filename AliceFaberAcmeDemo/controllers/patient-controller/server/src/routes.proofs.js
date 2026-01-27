@@ -76,25 +76,36 @@ router.get("/:id/detail", async (req, res) => {
  * POST /api/proofs/:id/accept
  * body: { revealAttrNames?: string[] }  // 要揭露的欄位名稱（encounter_class ...）
  */
+// POST /api/proofs/:id/accept  → 按下「確認送出 ZKP」時
 router.post("/:id/accept", async (req, res) => {
   try {
-    const proofExId = req.params.id;
-    const { revealAttrNames } = req.body || {};
-
-    const result = await acapy.sendProofPresentation(
-      proofExId,
-      revealAttrNames
+    const selectedReferents = req.body?.selectedReferents;
+    const data = await acapy.sendProofPresentation(
+      req.params.id,
+      selectedReferents
     );
-
-    res.json({ ok: true, result });
+    res.json({ ok: true, data });
   } catch (err) {
     console.error("[PS] [POST accept proof] error:", err.message);
-    res.status(500).json({
-      ok: false,
-      error: err.response?.data || err.message,
-    });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+
+// 取得某一筆 proof record 可用的 credentials（用來顯示整張 VC）
+router.get("/:id/credentials", async (req, res) => {
+  try {
+    const results = await acapy.getProofCredentials(req.params.id);
+    res.json({ ok: true, results });
+  } catch (err) {
+    console.error(
+      "[PS] [GET /api/proofs/:id/credentials] error:",
+      err.message
+    );
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 
 /**
  * 使用者按「拒絕」時

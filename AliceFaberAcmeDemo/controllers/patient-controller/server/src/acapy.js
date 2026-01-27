@@ -360,7 +360,28 @@ export async function getCredentialRecord(credExId) {
   }
 }
 
-
+// 取得此 proof_exchange 可以用的 credentials（裡面有整張 VC 的 attrs）
+export async function getProofCredentials(proofExId) {
+  try {
+    const res = await axios.get(
+      `${AGENT_BASE}/present-proof/records/${proofExId}/credentials`
+    );
+    // ACA-Py 會回傳陣列，每一個 element 形如：
+    // { cred_info: { referent, attrs: {...} }, presentation_referents: [...] }
+    return res.data;
+  } catch (e) {
+    console.error(
+      "[PS] ACA-Py GET /present-proof/records/{id}/credentials error:",
+      e.response?.status,
+      e.response?.data || e.message
+    );
+    const detail =
+      typeof e.response?.data === "string"
+        ? e.response.data
+        : JSON.stringify(e.response?.data || { error: e.message });
+    throw new Error(detail);
+  }
+}
 
 /** 接受某一筆 offer：只送 request，不在這裡 store */
 /** 按下 Accept 時，對 ACA-Py 下 send-request（做法 B 第一步） */
@@ -440,15 +461,14 @@ export async function getProofs() {
 // 自動替這個 proof_ex_id 找錢包裡可用的 credential，然後送 presentation
 // revealAttrNames: 可選，陣列，例如 ["encounter_class", "admission_date", ...]
 // 不傳或傳 null → 預設全部欄位 revealed: true
-export async function sendProofPresentation(proofExId, revealAttrNames = null) {
+export async function sendProofPresentation(proofExId, selectedReferents) {
   try {
-    // 1) 先拿這筆 proof exchange record，看它要哪些屬性
+    // 1) 先拿 proof record，看它要哪些欄位
     const recRes = await axios.get(
       `${AGENT_BASE}/present-proof/records/${proofExId}`
     );
     const rec = recRes.data;
 
-    // 取出 proof_request 本體
     const proofReq =
       rec.presentation_request?.proof_request ||
       rec.presentation_request ||
@@ -459,9 +479,22 @@ export async function sendProofPresentation(proofExId, revealAttrNames = null) {
       throw new Error("No requested_attributes found in proof request.");
     }
 
-    const requestedAttrs = proofReq.requested_attributes;
+    const allReferents = Object.keys(proofReq.requested_attributes);
 
-    // 2) 一次把所有 candidate credentials 拿出來
+    // 如果前端有傳 selectedReferents，就只送那些；沒傳就全部送
+    let targetReferents = allReferents;
+    if (Array.isArray(selectedReferents) && selectedReferents.length > 0) {
+      targetReferents = allReferents.filter((r) =>
+        selectedReferents.includes(r)
+      );
+      if (!targetReferents.length) {
+        throw new Error(
+          "Selected attributes do not match any requested referents."
+        );
+      }
+    }
+
+    // 2) 拿這個 proof_ex_id 下，可用的 credentials
     const credsRes = await axios.get(
       `${AGENT_BASE}/present-proof/records/${proofExId}/credentials`
     );
@@ -475,8 +508,8 @@ export async function sendProofPresentation(proofExId, revealAttrNames = null) {
 
     const requestedAttributesBody = {};
 
-    // 3) 對每一個 referent，找一張能用的 credential
-    for (const [referent, reqItem] of Object.entries(requestedAttrs)) {
+    // 3) 對每一個要送出的 referent，挑一張 credential
+    for (const referent of targetReferents) {
       const match = allCreds.find((c) =>
         (c.presentation_referents || []).includes(referent)
       );
@@ -490,22 +523,13 @@ export async function sendProofPresentation(proofExId, revealAttrNames = null) {
       const credInfo = match.cred_info || match;
       const credId = credInfo.referent;
 
-      // attrName 就是 Aries proof request 裡的 name
-      const attrName =
-        reqItem.name ||
-        (Array.isArray(reqItem.names) ? reqItem.names[0] : referent);
-
-      // 如果沒傳 revealAttrNames → 全部 revealed = true
-      const revealThis =
-        !revealAttrNames || revealAttrNames.includes(attrName);
-
       requestedAttributesBody[referent] = {
         cred_id: credId,
-        revealed: revealThis,
+        revealed: true,
       };
     }
 
-    // 4) 組出 send-presentation 需要的 payload
+    // 4) 組 payload
     const body = {
       self_attested_attributes: {},
       requested_attributes: requestedAttributesBody,
@@ -536,6 +560,7 @@ export async function sendProofPresentation(proofExId, revealAttrNames = null) {
     throw new Error(detail);
   }
 }
+
 
 
 // 3. 按下 Decline 時，回一個 problem-report
