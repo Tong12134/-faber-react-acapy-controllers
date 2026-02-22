@@ -18,17 +18,27 @@ http://localhost:9000
 ```
 
 **暫停與重啟服務**
-
 * **若要暫時關閉 VON（保留 ledger 資料）：**
+* 方法 A：使用內建腳本
 ```bash
 ./manage stop
-# 或是
+
+```
+
+* 方法 B：直接使用 Docker 指令
+```bash
 docker compose stop
 
 ```
 
-
 * **重新開啟 VON（沿用同一份 ledger）：**
+* 方法 A：使用內建腳本
+```bash
+./manage start
+
+```
+
+* 方法 B：直接使用 Docker 指令
 ```bash
 docker compose start
 
@@ -72,16 +82,20 @@ docker compose -f docker-compose.yml start hospital-agent patient-agent insurer-
 * **若要暫時關掉全部：**
 ```bash
 docker compose stop
-# 或是
+```
+或是
+
+```bash
 docker compose -f docker-compose.yml stop
 
 ```
 
-
 * **之後全部再開回來：**
 ```bash
 docker compose start
-# 或是
+```
+或是
+```bash
 docker compose -f docker-compose.yml start
 
 ```
@@ -99,8 +113,6 @@ docker compose -f docker-compose.yml up --build -d
 
 ```
 
-
-
 ---
 
 ### 3. 啟動 Controllers（前後端）
@@ -113,9 +125,9 @@ npm run dev-all
 
 執行後，Hospital / Patient / Insurer 三個 controller 會一起啟動（依你的設定對應到不同的 port）：
 
-* 🏥 **Hospital**：`http://localhost:5173`
-* 🧑‍⚕️ **Patient**：`http://localhost:5174`
-* 🛡️ **Insurer**：`http://localhost:5175`
+* 🏥 **Hospital**：[`http://localhost:5173`](http://localhost:5173)
+* 🧑‍⚕️ **Patient**：[`http://localhost:5174`](http://localhost:5174)
+* 🛡️ **Insurer**：[`http://localhost:5175`](http://localhost:5175)
 
 ---
 
@@ -123,7 +135,7 @@ npm run dev-all
 
 **徹底關閉 Docker（破壞性）**
 
-* > `down`（刪除容器/網路，但保留 volumes → wallet 還在）
+ `down`（刪除容器/網路，但保留 volumes → wallet 還在）
 
 
 ```bash
@@ -132,7 +144,7 @@ docker compose down
 ```
 
 
-* > `down -v`（停掉 docker 並清空 wallet volumes）
+`down -v`（停掉 docker 並清空 wallet volumes）
 
 
 ```bash
@@ -152,7 +164,7 @@ docker compose down -v
 
 **重新啟動（順序同上，只有 docker 修改）**
 
-* > 開啟：
+ 開啟：
 
 
 ```bash
