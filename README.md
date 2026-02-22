@@ -40,6 +40,9 @@ Aries agent 透過 **Hyperledger Indy ledger**（`genesis-url: http://host.docke
      ```
    * `hospital-agent`、`insurer-agent` 使用的 `--seed`（如 `faber0000...`、`acme0000...`）
      必須對應到 **已在 ledger 上註冊的 DID**（通常在啟動 ledger 的時候預先載入）。
+     ```text
+     http://localhost:9000
+     ```
 
 2. **環境需求**
 
