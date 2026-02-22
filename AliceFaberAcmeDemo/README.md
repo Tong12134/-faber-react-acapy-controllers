@@ -19,33 +19,39 @@ http://localhost:9000
 
 **暫停與重啟服務**
 * **若要暫時關閉 VON（保留 ledger 資料）：**
- 方法 A：使用內建腳本
+
+>  方法 A：使用內建腳本
+
 ```bash
 ./manage stop
 
 ```
 
- 方法 B：直接使用 Docker 指令
+>  方法 B：直接使用 Docker 指令
+
 ```bash
 docker compose stop
 
 ```
 
 * **重新開啟 VON（沿用同一份 ledger）：**
- 方法 A：使用內建腳本
+
+>  方法 A：使用內建腳本
+
 ```bash
 ./manage start
 
 ```
 
- 方法 B：直接使用 Docker 指令
+>  方法 B：直接使用 Docker 指令
+
 ```bash
 docker compose start
 
 ```
 
 
-> 💡 這樣註冊過的 hospital/insurer DID（NYM）會一直留著，就不需要每次重輸入。
+💡 這樣註冊過的 hospital/insurer DID（NYM）會一直留著，就不需要每次重輸入。
 
 ---
 
